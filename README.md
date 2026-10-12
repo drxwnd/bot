@@ -13,6 +13,13 @@ npm run dev       # http://localhost:3000
 npm test          # end-to-end test of the whole job flow
 ```
 
+To show the site off with realistic sample businesses, jobs, quotes and reviews, load the demo data into an empty folder:
+
+```
+DATA_DIR=./demo-data npm run demo
+DATA_DIR=./demo-data npm run dev
+```
+
 Without `STRIPE_SECRET_KEY`, payments are simulated so you can click through everything. Seeded logins: `admin@test.local`, `customer@test.local`, `tiler@test.local`, `plumber@test.local`, `pending@test.local`.
 
 ## How the money works
