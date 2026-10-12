@@ -3,6 +3,7 @@
   <span class="t"><%= job.title %></span>
   <span class="r"><%= ago(job.created_at) %></span>
   <span class="m">
+    <% if (job.sector && job.sector !== 'housing') { %><span class="sector-mark"><%= sectorName[job.sector] %></span><% } %>
     <span><%= tradeName[job.trade] %></span>
     <span><%= job.suburb %></span>
     <span><%= budgetName[job.budget] %></span>

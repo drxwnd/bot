@@ -54,7 +54,7 @@ async function onboardingLink(user, profile) {
       capabilities: { transfers: { requested: true } },
       business_profile: {
         name: profile.business_name,
-        product_description: 'Building, repair and maintenance work in Perth, WA',
+        product_description: 'Building, repair and maintenance work in Western Australia',
       },
       metadata: { user_id: String(user.id) },
     });

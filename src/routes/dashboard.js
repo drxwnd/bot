@@ -18,22 +18,23 @@ const q = {
     FROM quotes q JOIN jobs j ON j.id = q.job_id LEFT JOIN payments p ON p.job_id = j.id
     WHERE q.tradie_id = ? AND q.status != 'withdrawn' ORDER BY q.created_at DESC`),
   matchingJobs: db.prepare(`
-    SELECT id, title, trade, suburb, region, budget, created_at FROM jobs
+    SELECT id, sector, title, trade, suburb, region, budget, created_at FROM jobs
     WHERE status = 'open'
-      AND (',' || ? || ',') LIKE ('%,' || trade || ',%')
-      AND (',' || ? || ',') LIKE ('%,' || region || ',%')
-      AND id NOT IN (SELECT job_id FROM quotes WHERE tradie_id = ?)
+      AND (',' || @trades || ',') LIKE ('%,' || trade || ',%')
+      AND (',' || @regions || ',') LIKE ('%,' || region || ',%')
+      AND (',' || @sectors || ',') LIKE ('%,' || sector || ',%')
+      AND id NOT IN (SELECT job_id FROM quotes WHERE tradie_id = @uid)
     ORDER BY created_at DESC LIMIT 10`),
   earnings: db.prepare(`
     SELECT COALESCE(SUM(p.amount_cents - p.fee_cents), 0) AS paid_out
     FROM payments p JOIN quotes q ON q.id = p.quote_id
     WHERE q.tradie_id = ? AND p.status = 'released'`),
   upsertProfile: db.prepare(`
-    INSERT INTO tradie_profiles (user_id, business_name, abn, trades, regions, licence_no, insurer, insurance_expiry, years_trading, bio)
-    VALUES (@user_id, @business_name, @abn, @trades, @regions, @licence_no, @insurer, @insurance_expiry, @years_trading, @bio)
+    INSERT INTO tradie_profiles (user_id, business_name, abn, sectors, trades, regions, licence_no, tickets, insurer, insurance_expiry, years_trading, bio)
+    VALUES (@user_id, @business_name, @abn, @sectors, @trades, @regions, @licence_no, @tickets, @insurer, @insurance_expiry, @years_trading, @bio)
     ON CONFLICT (user_id) DO UPDATE SET
-      business_name = excluded.business_name, abn = excluded.abn, trades = excluded.trades,
-      regions = excluded.regions, licence_no = excluded.licence_no, insurer = excluded.insurer,
+      business_name = excluded.business_name, abn = excluded.abn, sectors = excluded.sectors, trades = excluded.trades,
+      regions = excluded.regions, tickets = excluded.tickets, licence_no = excluded.licence_no, insurer = excluded.insurer,
       insurance_expiry = excluded.insurance_expiry, years_trading = excluded.years_trading, bio = excluded.bio`),
   updateUser: db.prepare('UPDATE users SET name = ?, phone = ? WHERE id = ?'),
 };
@@ -51,7 +52,10 @@ router.get('/dashboard', requireLogin, (req, res) => {
     title: 'Dashboard',
     profile,
     quotes: q.tradieQuotes.all(user.id),
-    matches: profile && profile.status === 'approved' ? q.matchingJobs.all(profile.trades, profile.regions, user.id) : [],
+    matches:
+      profile && profile.status === 'approved'
+        ? q.matchingJobs.all({ trades: profile.trades, regions: profile.regions, sectors: profile.sectors, uid: user.id })
+        : [],
     paidOut: q.earnings.get(user.id).paid_out,
   });
 });
@@ -61,8 +65,8 @@ router.get('/dashboard', requireLogin, (req, res) => {
 router.get('/dashboard/profile', requireRole('tradie'), (req, res) => {
   const p = req.user.profile;
   const values = p
-    ? { ...p, trades: p.trades.split(','), regions: p.regions.split(','), name: req.user.name, phone: req.user.phone }
-    : { trades: [], regions: [], name: req.user.name, phone: req.user.phone };
+    ? { ...p, sectors: p.sectors.split(','), trades: p.trades.split(','), regions: p.regions.split(','), name: req.user.name, phone: req.user.phone }
+    : { sectors: ['housing'], trades: [], regions: [], name: req.user.name, phone: req.user.phone };
   res.render('pages/profile-edit', { title: 'Business details', values });
 });
 
@@ -74,9 +78,11 @@ router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
     phone: String(b.phone || '').trim(),
     business_name: String(b.business_name || '').trim().slice(0, 100),
     abn: String(b.abn || '').replace(/\s/g, ''),
+    sectors: list(b.sectors).filter((s) => C.sectorName[s]),
     trades: list(b.trades).filter((t) => C.tradeName[t]),
     regions: list(b.regions).filter((r) => C.regionName[r]),
     licence_no: String(b.licence_no || '').trim().slice(0, 50) || null,
+    tickets: String(b.tickets || '').trim().slice(0, 1000) || null,
     insurer: String(b.insurer || '').trim().slice(0, 100) || null,
     insurance_expiry: /^\d{4}-\d{2}-\d{2}$/.test(b.insurance_expiry || '') ? b.insurance_expiry : null,
     years_trading: Number.isInteger(Number(b.years_trading)) && b.years_trading !== '' ? Number(b.years_trading) : null,
@@ -87,6 +93,7 @@ router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
   if (!values.name) error = 'Enter your name.';
   else if (!values.business_name) error = 'Enter your business or trading name.';
   else if (!validAbn(values.abn)) error = "That ABN doesn't look right. Check it on abr.business.gov.au.";
+  else if (!values.sectors.length) error = 'Pick the kinds of work you want to see: homes, hotels, mining or all three.';
   else if (!values.trades.length) error = 'Pick at least one trade.';
   else if (!values.regions.length) error = "Pick the areas you'll travel to.";
   else if (!values.insurer || !values.insurance_expiry) error = 'We need your public liability insurer and expiry date.';
@@ -95,7 +102,12 @@ router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
 
   db.transaction(() => {
     q.updateUser.run(values.name, values.phone || null, req.user.id);
-    q.upsertProfile.run({ ...values, trades: values.trades.join(','), regions: values.regions.join(',') });
+    q.upsertProfile.run({
+      ...values,
+      sectors: values.sectors.join(','),
+      trades: values.trades.join(','),
+      regions: values.regions.join(','),
+    });
   })();
 
   flash(

@@ -21,6 +21,12 @@
         <hr>
       <% } %>
 
+      <% if (tradie.tickets) { %>
+        <h2 style="font-size:1.4rem">Tickets and inductions</h2>
+        <p class="prose"><%= tradie.tickets %></p>
+        <hr>
+      <% } %>
+
       <h2 style="font-size:1.4rem">Reviews</h2>
       <% if (!reviews.length) { %>
         <div class="empty">No reviews yet. Reviews can only be left by customers who've paid for a job through ezbuild.</div>
@@ -38,6 +44,7 @@
     <aside>
       <div class="box">
         <dl class="kv">
+          <dt>Works in</dt><dd><%= tradie.sectors.split(',').map(s => sectorName[s]).join(', ') %></dd>
           <dt>Trades</dt><dd><%= tradie.trades.split(',').map(s => tradeName[s]).join(', ') %></dd>
           <dt>Areas</dt><dd><%= tradie.regions.split(',').map(s => regionName[s]).join(', ') %></dd>
           <% if (tradie.years_trading) { %><dt>Experience</dt><dd><%= tradie.years_trading %> years</dd><% } %>

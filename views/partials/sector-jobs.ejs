@@ -1,0 +1,13 @@
+<section class="section">
+  <div class="wrap">
+    <h2>Open <%= sector.name.toLowerCase() %> jobs</h2>
+    <% if (jobs.length) { %>
+      <div class="job-rows">
+        <% jobs.forEach(job => { %><%- include('job-row', { job }) %><% }) %>
+      </div>
+      <p class="section-link"><a href="/jobs?sector=<%= sector.slug %>">See all <%= sector.name.toLowerCase() %> jobs</a></p>
+    <% } else { %>
+      <div class="empty">No open <%= sector.name.toLowerCase() %> jobs right now. New ones show up here as soon as they're posted.</div>
+    <% } %>
+  </div>
+</section>

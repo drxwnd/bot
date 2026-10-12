@@ -103,4 +103,16 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 `);
 
+// Columns added after launch. SQLite can't add a column with IF NOT EXISTS, so check first.
+function addColumn(table, column, definition) {
+  const exists = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+  if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+addColumn('users', 'company', 'TEXT');
+addColumn('jobs', 'sector', "TEXT NOT NULL DEFAULT 'housing'");
+addColumn('jobs', 'requirements', 'TEXT');
+addColumn('tradie_profiles', 'sectors', "TEXT NOT NULL DEFAULT 'housing'");
+addColumn('tradie_profiles', 'tickets', 'TEXT');
+
 module.exports = db;

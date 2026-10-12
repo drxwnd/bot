@@ -13,21 +13,62 @@ const TRADES = [
   { slug: 'aircon', name: 'Air con & heating' },
   { slug: 'handyman', name: 'Handyman' },
   { slug: 'renovation', name: 'Renovation & extensions' },
+  { slug: 'locksmith', name: 'Locks & security' },
+  { slug: 'appliances', name: 'Appliance repair' },
+  { slug: 'welding', name: 'Welding & fabrication' },
+  { slug: 'fitting', name: 'Mechanical fitting' },
+  { slug: 'scaffolding', name: 'Scaffolding' },
   { slug: 'other', name: 'Something else' },
 ];
 
-// Broad Perth metro regions. Tradies pick the ones they'll travel to.
-const REGIONS = [
-  { slug: 'cbd', name: 'Perth CBD & inner city' },
-  { slug: 'western', name: 'Western suburbs' },
-  { slug: 'northern', name: 'Northern suburbs' },
-  { slug: 'north-east', name: 'Swan Valley & north-east' },
-  { slug: 'eastern', name: 'Eastern suburbs & hills' },
-  { slug: 'south-east', name: 'South-east' },
-  { slug: 'southern', name: 'Southern suburbs' },
-  { slug: 'fremantle', name: 'Fremantle & surrounds' },
-  { slug: 'peel', name: 'Rockingham, Kwinana & Peel' },
+const SECTORS = [
+  {
+    slug: 'housing',
+    name: 'Housing',
+    short: 'Homes, rentals and units',
+    path: '/housing',
+    // What the extra job field is called for this sector, if it has one.
+    extraLabel: null,
+  },
+  {
+    slug: 'hotels',
+    name: 'Hotels',
+    short: 'Hotels, motels, short-stay and serviced apartments',
+    path: '/hotels',
+    extraLabel: 'Access and timing',
+    extraHint: 'When can work happen? e.g. between 10am and 2pm, after checkout, rooms we can block out, guest areas to avoid.',
+  },
+  {
+    slug: 'mining',
+    name: 'Mining',
+    short: 'Mine sites, camps, workshops and offices',
+    path: '/mining',
+    extraLabel: 'Site requirements',
+    extraHint: 'Inductions, tickets, medicals, PPE, FIFO or DIDO, and whether flights, meals and accommodation are provided.',
+  },
 ];
+
+// Tradies pick the ones they'll travel to.
+const REGIONS = [
+  { slug: 'cbd', name: 'Perth CBD & inner city', group: 'Perth metro' },
+  { slug: 'western', name: 'Western suburbs', group: 'Perth metro' },
+  { slug: 'northern', name: 'Northern suburbs', group: 'Perth metro' },
+  { slug: 'north-east', name: 'Swan Valley & north-east', group: 'Perth metro' },
+  { slug: 'eastern', name: 'Eastern suburbs & hills', group: 'Perth metro' },
+  { slug: 'south-east', name: 'South-east', group: 'Perth metro' },
+  { slug: 'southern', name: 'Southern suburbs', group: 'Perth metro' },
+  { slug: 'fremantle', name: 'Fremantle & surrounds', group: 'Perth metro' },
+  { slug: 'peel', name: 'Rockingham, Kwinana & Peel', group: 'Perth metro' },
+  { slug: 'south-west', name: 'South West (Bunbury, Margaret River)', group: 'Regional WA' },
+  { slug: 'great-southern', name: 'Great Southern (Albany)', group: 'Regional WA' },
+  { slug: 'wheatbelt', name: 'Wheatbelt', group: 'Regional WA' },
+  { slug: 'mid-west', name: 'Mid West (Geraldton)', group: 'Regional WA' },
+  { slug: 'goldfields', name: 'Goldfields-Esperance (Kalgoorlie)', group: 'Regional WA' },
+  { slug: 'pilbara', name: 'Pilbara (Karratha, Port Hedland, Newman)', group: 'Regional WA' },
+  { slug: 'kimberley', name: 'Kimberley (Broome, Kununurra)', group: 'Regional WA' },
+];
+
+const REGION_GROUPS = ['Perth metro', 'Regional WA'];
 
 const TIMINGS = [
   { slug: 'urgent', name: 'Urgent, within a few days' },
@@ -49,10 +90,14 @@ const lookup = (list) => Object.fromEntries(list.map((x) => [x.slug, x.name]));
 
 module.exports = {
   TRADES,
+  SECTORS,
   REGIONS,
+  REGION_GROUPS,
   TIMINGS,
   BUDGETS,
   tradeName: lookup(TRADES),
+  sectorName: lookup(SECTORS),
+  sectorBySlug: Object.fromEntries(SECTORS.map((x) => [x.slug, x])),
   regionName: lookup(REGIONS),
   timingName: lookup(TIMINGS),
   budgetName: lookup(BUDGETS),

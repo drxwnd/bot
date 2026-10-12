@@ -11,6 +11,7 @@
     <h1><%= job.title %></h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <span class="tag <%= job.status %>"><%= STATUS_LABEL[job.status] %></span>
+      <% if (job.sector !== 'housing') { %><span class="tag"><%= sectorName[job.sector] %></span><% } %>
       <span class="tag"><%= tradeName[job.trade] %></span>
     </div>
   </div>
@@ -147,6 +148,7 @@
           <h3>Customer details</h3>
           <dl class="kv">
             <dt>Name</dt><dd><%= job.customer_name %></dd>
+            <% if (job.customer_company) { %><dt>Business</dt><dd><%= job.customer_company %></dd><% } %>
             <% if (job.customer_phone) { %><dt>Phone</dt><dd><a href="tel:<%= job.customer_phone.replace(/\s/g, '') %>"><%= job.customer_phone %></a></dd><% } %>
             <dt>Email</dt><dd><a href="mailto:<%= job.customer_email %>"><%= job.customer_email %></a></dd>
             <dt>Address</dt><dd><%= job.address || 'Not given. Ask the customer.' %>, <%= job.suburb %> <%= job.postcode %></dd>
@@ -169,6 +171,10 @@
       <%# ---------- Job details (everyone) ---------- %>
       <h2 style="font-size:1.4rem">Job details</h2>
       <p class="prose"><%= job.description %></p>
+      <% if (job.requirements && sectorBySlug[job.sector].extraLabel) { %>
+        <h3 style="margin-top:28px"><%= sectorBySlug[job.sector].extraLabel %></h3>
+        <p class="prose"><%= job.requirements %></p>
+      <% } %>
       <% if (photos.length) { %>
         <div class="photos">
           <% photos.forEach(p => { %><a href="/uploads/<%= p.filename %>" target="_blank" rel="noopener"><img src="/uploads/<%= p.filename %>" alt="Photo of the job" loading="lazy"></a><% }) %>
@@ -230,8 +236,9 @@
       <div class="box">
         <dl class="kv">
           <dt>Job</dt><dd class="mono">#<%= jobNo %></dd>
+          <dt>Type</dt><dd><%= sectorName[job.sector] %></dd>
           <dt>Trade</dt><dd><%= tradeName[job.trade] %></dd>
-          <dt>Suburb</dt><dd><%= job.suburb %> <%= job.postcode %></dd>
+          <dt>Location</dt><dd><%= job.suburb %> <%= job.postcode %></dd>
           <dt>Area</dt><dd><%= regionName[job.region] %></dd>
           <dt>Budget</dt><dd><%= budgetName[job.budget] %></dd>
           <dt>Timing</dt><dd><%= timingName[job.timing] %></dd>

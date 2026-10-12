@@ -1,0 +1,5 @@
+<% REGION_GROUPS.forEach(g => { %>
+  <optgroup label="<%= g %>">
+    <% REGIONS.filter(r => r.group === g).forEach(r => { %><option value="<%= r.slug %>" <%= selected === r.slug ? 'selected' : '' %>><%= r.name %></option><% }) %>
+  </optgroup>
+<% }) %>

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= title ? `${title} | ${siteName}` : `${siteName} | Local tradies for Perth repair, maintenance and building jobs` %></title>
-  <meta name="description" content="<%= typeof description !== 'undefined' ? description : 'Post a repair, maintenance or building job in Perth and get quotes from checked local tradies. Your payment is held until the job is done.' %>">
+  <title><%= title ? `${title} | ${siteName}` : `${siteName} | Tradies for homes, hotels and mine sites in WA` %></title>
+  <meta name="description" content="<%= typeof description !== 'undefined' ? description : 'Post a repair, maintenance or building job for a home, hotel or mine site in WA and get quotes from checked tradies. Your payment is held until the job is done.' %>">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,8 +18,8 @@
     <a class="logo" href="/"><%- include('mark') %>ezbuild</a>
 
     <nav class="nav" aria-label="Main">
+      <% SECTORS.forEach(s => { %><a href="<%= s.path %>" class="<%= path === s.path ? 'on' : '' %>"><%= s.name %></a><% }) %>
       <a href="/jobs" class="<%= path === '/jobs' ? 'on' : '' %>">Browse jobs</a>
-      <a href="/how-it-works" class="<%= path === '/how-it-works' ? 'on' : '' %>">How it works</a>
       <a href="/for-tradies" class="<%= path === '/for-tradies' ? 'on' : '' %>">For tradies</a>
       <div class="right">
         <% if (user) { %>
@@ -39,6 +39,7 @@
       <summary>Menu</summary>
       <div class="panel">
         <% if (!user || user.role !== 'tradie') { %><a href="/jobs/new"><strong>Post a job</strong></a><% } %>
+        <% SECTORS.forEach(s => { %><a href="<%= s.path %>"><%= s.name %></a><% }) %>
         <a href="/jobs">Browse jobs</a>
         <a href="/how-it-works">How it works</a>
         <a href="/for-tradies">For tradies</a>

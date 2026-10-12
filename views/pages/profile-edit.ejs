@@ -33,6 +33,15 @@
       </div>
 
       <div class="field">
+        <span class="label">Work you want to see</span>
+        <div class="checks">
+          <% SECTORS.forEach(s => { %>
+            <label><input type="checkbox" name="sectors" value="<%= s.slug %>" <%= values.sectors.includes(s.slug) ? 'checked' : '' %>> <%= s.name %></label>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="field">
         <span class="label">Trades <span class="hint" style="display:inline">(pick all that apply)</span></span>
         <div class="checks">
           <% TRADES.filter(t => t.slug !== 'other').forEach(t => { %>
@@ -43,11 +52,14 @@
 
       <div class="field">
         <span class="label">Areas you'll travel to</span>
-        <div class="checks">
-          <% REGIONS.forEach(r => { %>
-            <label><input type="checkbox" name="regions" value="<%= r.slug %>" <%= values.regions.includes(r.slug) ? 'checked' : '' %>> <%= r.name %></label>
-          <% }) %>
-        </div>
+        <% REGION_GROUPS.forEach(g => { %>
+          <span class="hint" style="margin:10px 0 6px"><%= g %></span>
+          <div class="checks">
+            <% REGIONS.filter(r => r.group === g).forEach(r => { %>
+              <label><input type="checkbox" name="regions" value="<%= r.slug %>" <%= values.regions.includes(r.slug) ? 'checked' : '' %>> <%= r.name %></label>
+            <% }) %>
+          </div>
+        <% }) %>
       </div>
 
       <hr>
@@ -57,6 +69,13 @@
           <span class="hint">Required for electrical, plumbing, gas and building work over $20,000 in WA. Leave blank if your trade doesn't need one.</span>
         </label>
         <input id="licence_no" name="licence_no" type="text" value="<%= values.licence_no || '' %>">
+      </div>
+
+      <div class="field">
+        <label for="tickets">Tickets and inductions <span class="hint" style="display:inline">(optional)</span>
+          <span class="hint">Worth filling in for mining work. e.g. White Card, working at heights, confined space, EWP, current medical, inducted at Newman or Kalgoorlie sites.</span>
+        </label>
+        <textarea id="tickets" name="tickets" maxlength="1000" style="min-height:90px"><%= values.tickets || '' %></textarea>
       </div>
 
       <div class="row">

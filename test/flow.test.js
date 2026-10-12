@@ -87,7 +87,7 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   await tradie.get('/dashboard/profile');
   const profileFields = {
     name: 'Terry Tiler', phone: '0400 123 456', business_name: 'Terry Tiles', abn: '12 345 678 901',
-    trades: 'tiling', regions: 'eastern', insurer: 'QBE', insurance_expiry: '2027-01-01', years_trading: '12',
+    sectors: 'housing', trades: 'tiling', regions: 'eastern', insurer: 'QBE', insurance_expiry: '2027-01-01', years_trading: '12',
   };
   let res = await tradie.post('/dashboard/profile', profileFields);
   assert.match(res.text, /ABN doesn&#39;t look right/);
@@ -101,7 +101,7 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
     'base64',
   );
   res = await customer.form('/jobs', {
-    title: 'Regrout shower', trade: 'tiling', suburb: 'Bayswater', postcode: '6053', region: 'eastern',
+    sector: 'housing', title: 'Regrout shower', trade: 'tiling', suburb: 'Bayswater', postcode: '6053', region: 'eastern',
     address: '1 Test St', description: 'Shower grout cracking and four floor tiles need replacing.',
     budget: '500-2k', timing: 'two-weeks', photos: new Blob([png], { type: 'image/png' }),
   });
@@ -109,6 +109,28 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   const jobUrl = res.location;
   const jobId = Number(jobUrl.split('/').pop());
   assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM job_photos WHERE job_id = ?').get(jobId).n, 1);
+
+  // Mining jobs must say what's needed to get on site.
+  await customer.get('/jobs/new?sector=mining');
+  const miningJob = {
+    sector: 'mining', title: 'Replace air con in six camp rooms', trade: 'aircon', suburb: 'Newman',
+    postcode: '6753', region: 'pilbara', description: 'Six split systems in the camp have failed and need replacing.',
+    budget: '10k-50k', timing: 'month',
+  };
+  res = await customer.form('/jobs', miningJob);
+  assert.strictEqual(res.status, 400);
+  assert.match(res.text, /site requirements/);
+  res = await customer.form('/jobs', { ...miningJob, requirements_mining: 'Site induction, White Card. DIDO from Newman.' });
+  assert.strictEqual(res.status, 302);
+  const miningUrl = res.location;
+  res = await browser().get(miningUrl);
+  assert.match(res.text, /DIDO from Newman/);
+  res = await browser().get('/jobs?sector=mining');
+  assert.match(res.text, /camp rooms/);
+  assert.doesNotMatch(res.text, /Regrout shower/);
+  for (const page of ['/housing', '/hotels', '/mining']) {
+    assert.strictEqual((await browser().get(page)).status, 200);
+  }
 
   // Public board shows it, but not the private address.
   res = await browser().get('/jobs');

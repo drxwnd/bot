@@ -29,12 +29,13 @@ function removeUploads(files) {
 
 const q = {
   job: db.prepare(`
-    SELECT j.*, u.name AS customer_name, u.email AS customer_email, u.phone AS customer_phone
+    SELECT j.*, u.name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
+      u.company AS customer_company
     FROM jobs j JOIN users u ON u.id = j.customer_id WHERE j.id = ?`),
   photos: db.prepare('SELECT filename FROM job_photos WHERE job_id = ?'),
   insertJob: db.prepare(`
-    INSERT INTO jobs (customer_id, title, trade, suburb, postcode, address, region, description, budget, timing)
-    VALUES (@customer_id, @title, @trade, @suburb, @postcode, @address, @region, @description, @budget, @timing)`),
+    INSERT INTO jobs (customer_id, sector, title, trade, suburb, postcode, address, region, description, requirements, budget, timing)
+    VALUES (@customer_id, @sector, @title, @trade, @suburb, @postcode, @address, @region, @description, @requirements, @budget, @timing)`),
   insertPhoto: db.prepare('INSERT INTO job_photos (job_id, filename) VALUES (?, ?)'),
   quotesForJob: db.prepare(`
     SELECT q.*, u.name AS tradie_name, u.email AS tradie_email, u.phone AS tradie_phone,
@@ -85,20 +86,28 @@ function ownsJob(req, res, next) {
 router.get('/jobs', (req, res) => {
   const trade = C.tradeName[req.query.trade] ? req.query.trade : '';
   const region = C.regionName[req.query.region] ? req.query.region : '';
+  const sector = C.sectorName[req.query.sector] ? req.query.sector : '';
   const where = ["j.status = 'open'"];
   const params = {};
+  if (sector) { where.push('j.sector = @sector'); params.sector = sector; }
   if (trade) { where.push('j.trade = @trade'); params.trade = trade; }
   if (region) { where.push('j.region = @region'); params.region = region; }
 
   const jobs = db
     .prepare(`
-      SELECT j.id, j.title, j.trade, j.suburb, j.postcode, j.region, j.budget, j.timing, j.description, j.created_at,
+      SELECT j.id, j.sector, j.title, j.trade, j.suburb, j.postcode, j.region, j.budget, j.timing, j.description, j.created_at,
         (SELECT COUNT(*) FROM quotes WHERE job_id = j.id AND status != 'withdrawn') AS quote_count,
         (SELECT COUNT(*) FROM job_photos WHERE job_id = j.id) AS photo_count
       FROM jobs j WHERE ${where.join(' AND ')} ORDER BY j.created_at DESC LIMIT 100`)
     .all(params);
 
-  res.render('pages/jobs', { title: 'Jobs in Perth', jobs, trade, region });
+  res.render('pages/jobs', {
+    title: sector ? `${C.sectorName[sector]} jobs in WA` : 'Jobs around WA',
+    jobs,
+    trade,
+    region,
+    sector,
+  });
 });
 
 // ---- Post a job ----
@@ -112,7 +121,13 @@ router.get('/jobs/new', (req, res) => {
     flash(req, 'info', 'Tradie accounts quote on jobs. Use a separate customer account to post one.');
     return res.redirect('/jobs');
   }
-  res.render('pages/job-new', { title: 'Post a job', values: { trade: req.query.trade || '' } });
+  res.render('pages/job-new', {
+    title: 'Post a job',
+    values: {
+      trade: req.query.trade || '',
+      sector: C.sectorName[req.query.sector] ? req.query.sector : 'housing',
+    },
+  });
 });
 
 router.post(
@@ -124,6 +139,7 @@ router.post(
     const b = req.body;
     const values = {
       customer_id: req.user.id,
+      sector: C.sectorName[b.sector] ? b.sector : '',
       title: String(b.title || '').trim().slice(0, 120),
       trade: String(b.trade || ''),
       suburb: String(b.suburb || '').trim().slice(0, 60),
@@ -131,16 +147,20 @@ router.post(
       address: String(b.address || '').trim().slice(0, 200) || null,
       region: String(b.region || ''),
       description: String(b.description || '').trim().slice(0, 5000),
+      // Each sector has its own extra field on the form; keep only the one that matches.
+      requirements: String(b[`requirements_${b.sector}`] || '').trim().slice(0, 2000) || null,
       budget: String(b.budget || ''),
       timing: String(b.timing || ''),
     };
 
     let error = null;
-    if (values.title.length < 6) error = 'Give the job a short title, e.g. "Regrout shower and replace 4 cracked tiles".';
+    if (!values.sector) error = 'Pick whether this is for a home, a hotel or a mine site.';
+    else if (values.title.length < 6) error = 'Give the job a short title, e.g. "Regrout shower and replace 4 cracked tiles".';
     else if (!C.tradeName[values.trade]) error = 'Pick the trade that best fits the job.';
-    else if (!values.suburb) error = 'Enter the suburb the job is in.';
+    else if (!values.suburb) error = 'Enter the suburb, town or site the job is at.';
     else if (!/^6\d{3}$/.test(values.postcode)) error = 'Enter a WA postcode (6000–6999).';
-    else if (!C.regionName[values.region]) error = 'Pick the area of Perth the job is in.';
+    else if (!C.regionName[values.region]) error = 'Pick the area the job is in.';
+    else if (values.sector === 'mining' && !values.requirements) error = 'Add the site requirements so tradies know what they need before quoting.';
     else if (values.description.length < 30) error = 'Describe the job in a bit more detail so tradies can price it properly.';
     else if (!C.budgetName[values.budget]) error = 'Pick a rough budget.';
     else if (!C.timingName[values.timing]) error = 'Pick when you need it done.';
@@ -306,7 +326,7 @@ router.post('/jobs/:id/release', requireLogin, loadJob, ownsJob, async (req, res
   }
   try {
     await payments.release(payment, profile);
-    flash(req, 'success', 'Payment released. Thanks for using us. Leave a review below to help other Perth locals.');
+    flash(req, 'success', 'Payment released. Thanks for using us. Leave a review below to help the next person pick a tradie.');
     res.redirect(`/jobs/${job.id}#review`);
   } catch (err) {
     next(err);

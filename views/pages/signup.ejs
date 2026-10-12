@@ -27,6 +27,13 @@
       <label for="email">Email</label>
       <input id="email" name="email" type="email" autocomplete="email" value="<%= values.email || '' %>" required>
     </div>
+    <% if (as !== 'tradie') { %>
+      <div class="field">
+        <label for="company">Business or organisation <span class="hint" style="display:inline">(optional)</span></label>
+        <input id="company" name="company" type="text" autocomplete="organization" value="<%= values.company || '' %>">
+        <span class="hint">For hotels, property managers and mining companies. Leave blank if it's your own home.</span>
+      </div>
+    <% } %>
     <div class="field">
       <label for="phone">Mobile <% if (as !== 'tradie') { %><span class="hint" style="display:inline">(optional)</span><% } %></label>
       <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="04xx xxx xxx" value="<%= values.phone || '' %>" <%= as === 'tradie' ? 'required' : '' %>>

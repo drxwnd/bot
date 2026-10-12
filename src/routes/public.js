@@ -1,10 +1,11 @@
 const express = require('express');
 const db = require('../db');
+const C = require('../constants');
 
 const router = express.Router();
 
 const recentJobs = db.prepare(`
-  SELECT id, title, trade, suburb, budget, created_at,
+  SELECT id, sector, title, trade, suburb, budget, created_at,
     (SELECT COUNT(*) FROM quotes WHERE job_id = jobs.id AND status != 'withdrawn') AS quote_count
   FROM jobs WHERE status = 'open' ORDER BY created_at DESC LIMIT 5`);
 
@@ -16,6 +17,21 @@ const counts = db.prepare(`
 router.get('/', (req, res) => {
   res.render('pages/home', { title: null, jobs: recentJobs.all(), counts: counts.get() });
 });
+
+const sectorJobs = db.prepare(`
+  SELECT id, sector, title, trade, suburb, budget, created_at,
+    (SELECT COUNT(*) FROM quotes WHERE job_id = jobs.id AND status != 'withdrawn') AS quote_count
+  FROM jobs WHERE status = 'open' AND sector = ? ORDER BY created_at DESC LIMIT 5`);
+
+for (const sector of C.SECTORS) {
+  router.get(sector.path, (req, res) => {
+    res.render(`pages/sector-${sector.slug}`, {
+      title: sector.name,
+      sector,
+      jobs: sectorJobs.all(sector.slug),
+    });
+  });
+}
 
 router.get('/how-it-works', (req, res) => {
   res.render('pages/how', { title: 'How it works' });

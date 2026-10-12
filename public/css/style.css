@@ -1536,3 +1536,117 @@ td form {
 .tag::first-letter {
   text-transform: uppercase;
 }
+
+/* Sector picker on the job form */
+.sector-pick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sector-pick label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 12px;
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: var(--white);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.sector-pick strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+}
+
+.sector-pick input {
+  accent-color: var(--accent);
+  margin-top: 3px;
+}
+
+.sector-pick label:has(input:checked) {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+@media (max-width: 600px) {
+  .sector-pick {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Extra field per sector. Shown only when that sector is picked. */
+.sector-extra {
+  display: none;
+}
+
+form:has(input[name='sector'][value='hotels']:checked) .sector-extra-hotels,
+form:has(input[name='sector'][value='mining']:checked) .sector-extra-mining {
+  display: block;
+}
+
+.sector-mark {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+@media (max-width: 1000px) {
+  .nav {
+    display: none;
+  }
+
+  .menu {
+    display: block;
+  }
+}
+
+.tick-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tick-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tick-list li:first-child {
+  border-top: 1px solid var(--rule);
+}
+
+.sector-rows {
+  border-top: 1px solid var(--ink);
+}
+
+.sector-row {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 8px 32px;
+  align-items: baseline;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sector-row h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.sector-row p {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+@media (max-width: 760px) {
+  .sector-row {
+    grid-template-columns: 1fr;
+  }
+}
