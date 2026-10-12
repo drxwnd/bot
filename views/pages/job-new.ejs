@@ -37,7 +37,7 @@
 
       <div class="field">
         <label for="description">Details
-          <span class="hint">Sizes, materials, access, anything that's already been tried. Don't put your phone number or address here.</span>
+          <span class="hint">Sizes, materials, access, anything that's already been tried. Don't put your phone number or address here. Everyone can see this.</span>
         </label>
         <textarea id="description" name="description" maxlength="5000" required placeholder="e.g. Bathroom about 2.4m x 1.8m. Grout in the shower is cracking and there's a damp patch on the wall behind it. Four floor tiles near the vanity are cracked. I have a few spare tiles from when it was laid."><%= values.description || '' %></textarea>
       </div>
@@ -59,29 +59,22 @@
 
       <hr>
 
-      <div class="row">
-        <div class="field">
-          <label for="suburb">Suburb, town or site</label>
-          <input id="suburb" name="suburb" type="text" required value="<%= values.suburb || '' %>" placeholder="e.g. Morley, Karratha">
-        </div>
-        <div class="field">
-          <label for="postcode">Postcode</label>
-          <input id="postcode" name="postcode" type="text" inputmode="numeric" pattern="6[0-9]{3}" maxlength="4" required value="<%= values.postcode || '' %>" placeholder="6062">
-        </div>
+      <div class="field">
+        <label for="address">Job address
+          <span class="hint">Street address and suburb, or for a mine site, the site name and nearest town. Only the suburb or town is shown publicly. The full address goes to the tradie you accept.</span>
+        </label>
+        <input id="address" name="address" type="text" autocomplete="street-address" required maxlength="200" value="<%= values.address || '' %>" placeholder="e.g. 12 Smith St, Morley WA 6062" data-locate>
+        <p class="locate-preview" id="locate-preview" aria-live="polite"><% if (values.suburb) { %>Shown publicly as <strong><%= values.suburb %></strong><% } %></p>
       </div>
 
       <div class="field">
-        <label for="region">Area</label>
-        <select id="region" name="region" required>
-          <option value="">Choose one</option>
+        <label for="region">Area tag
+          <span class="hint">We fill this in from the address. Change it if it's wrong.</span>
+        </label>
+        <select id="region" name="region">
+          <option value="">Work it out from the address</option>
           <%- include('../partials/region-options', { selected: values.region }) %>
         </select>
-      </div>
-
-      <div class="field">
-        <label for="address">Street address <span class="hint" style="display:inline">(optional)</span></label>
-        <input id="address" name="address" type="text" autocomplete="street-address" value="<%= values.address || '' %>">
-        <span class="hint">Kept private. Only the tradie you accept will see it. For mine sites, the site or camp name is enough.</span>
       </div>
 
       <hr>

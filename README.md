@@ -41,6 +41,12 @@ Any host that runs Node 20+ with a persistent disk works (Render, Railway, Fly.i
 3. Run `npm install`, then `npm start`.
 4. Point your domain at the host.
 
+## Job locations
+
+Customers type one address. `src/locality.js` finds the suburb or town in it, along with the postcode and area tag. Only the suburb is shown publicly. The full address is shown to the customer and to the tradie whose quote they accept.
+
+The WA suburb list (`src/data/wa-localities.json`) is built from the community-maintained [australianpostcodes](https://github.com/matthewproctor/australianpostcodes) list. Each suburb gets the area of its nearest reference town. To refresh it, download `australian_postcodes.csv` from that repo and run `node scripts/build-localities.js australian_postcodes.csv`.
+
 ## SEO
 
 - Every page has its own title, description, canonical URL and social share tags (`views/partials/head.ejs`).

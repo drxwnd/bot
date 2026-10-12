@@ -39,23 +39,23 @@ profile.run(t3, 'Not Yet Approved', 'housing', 'painting', 'peel', null, 2, null
 const jobCount = db.prepare('SELECT COUNT(*) AS n FROM jobs').get().n;
 if (!jobCount) {
   const job = db.prepare(`
-    INSERT INTO jobs (customer_id, sector, requirements, title, trade, suburb, postcode, region, description, budget, timing, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?))`);
+    INSERT INTO jobs (customer_id, sector, requirements, title, trade, suburb, postcode, region, description, budget, timing, created_at, address)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?), ? || ' Test St, ' || ? || ' WA ' || ?)`);
   job.run(customer, 'housing', null, 'Regrout shower and replace four cracked floor tiles', 'tiling', 'Bayswater', '6053', 'eastern',
     'Main bathroom, about 2.4 x 1.8m. Shower grout is cracking and there is a damp patch on the wall behind it. Four floor tiles near the vanity are cracked. I have some spare tiles left over.',
-    '500-2k', 'two-weeks', '-3 hours');
+    '500-2k', 'two-weeks', '-3 hours', '12', 'Bayswater', '6053');
   job.run(customer, 'housing', null, 'Leaking kitchen mixer tap', 'plumbing', 'Scarborough', '6019', 'northern',
     'Single lever mixer has been dripping for a week and now leaks from the base when turned on. Happy to supply a new tap if needed.',
-    'under-500', 'urgent', '-1 day');
+    'under-500', 'urgent', '-1 day', '12', 'Scarborough', '6019');
   job.run(customer, 'hotels', 'Rooms 104 to 108 can be blocked out Monday to Wednesday. Work between 10am and 3pm only.', 'Reseal showers in five guest rooms', 'tiling', 'Fremantle', '6160', 'fremantle',
     'Silicone has failed in five ensuites on the first floor. Some grout is also cracking. Rooms are about 15 years old.',
-    '2k-10k', 'two-weeks', '-5 hours');
+    '2k-10k', 'two-weeks', '-5 hours', '12', 'Fremantle', '6160');
   job.run(customer, 'mining', 'Site induction required. White Card and current medical. DIDO from Newman, meals provided.', 'Replace split systems in camp rooms', 'aircon', 'Newman', '6753', 'pilbara',
     'Eight split system units in the village have failed. Need removal and replacement with like-for-like units.',
-    '10k-50k', 'month', '-1 day');
+    '10k-50k', 'month', '-1 day', '12', 'Newman', '6753');
   job.run(customer, 'housing', null, 'Patio paving, about 30 square metres', 'concreting', 'Baldivis', '6171', 'peel',
     'Backyard is currently sand. Want it levelled and paved with standard 400x400 pavers. Access down the side of the house is 1.1m wide.',
-    '2k-10k', 'month', '-2 days');
+    '2k-10k', 'month', '-2 days', '12', 'Baldivis', '6171');
 }
 
 console.log(`Seeded. Log in with any of these (password: password123):

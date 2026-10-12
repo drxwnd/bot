@@ -1717,3 +1717,14 @@ form:has(input[name='sector'][value='mining']:checked) .sector-extra-mining {
   border-color: var(--ink);
   color: inherit;
 }
+
+.locate-preview {
+  margin: 8px 0 0;
+  min-height: 1.4em;
+  font-size: 0.9rem;
+  color: var(--ok);
+}
+
+.locate-preview.is-error {
+  color: var(--warn);
+}

@@ -10,6 +10,7 @@ const C = require('../constants');
 const payments = require('../payments');
 const { parseDollars } = require('../helpers');
 const seo = require('../seo');
+const { locate, errorMessage } = require('../locality');
 const { flash, verifyCsrf, requireLogin, requireRole, requireApprovedTradie } = require('../middleware');
 
 const router = express.Router();
@@ -96,7 +97,7 @@ router.get('/jobs', (req, res) => {
 
   const jobs = db
     .prepare(`
-      SELECT j.id, j.sector, j.title, j.trade, j.suburb, j.postcode, j.region, j.budget, j.timing, j.description, j.created_at,
+      SELECT j.id, j.sector, j.title, j.trade, j.suburb, j.region, j.budget, j.timing, j.description, j.created_at,
         (SELECT COUNT(*) FROM quotes WHERE job_id = j.id AND status != 'withdrawn') AS quote_count,
         (SELECT COUNT(*) FROM job_photos WHERE job_id = j.id) AS photo_count
       FROM jobs j WHERE ${where.join(' AND ')} ORDER BY j.created_at DESC LIMIT 100`)
@@ -146,10 +147,11 @@ router.post(
       sector: C.sectorName[b.sector] ? b.sector : '',
       title: String(b.title || '').trim().slice(0, 120),
       trade: String(b.trade || ''),
-      suburb: String(b.suburb || '').trim().slice(0, 60),
-      postcode: String(b.postcode || '').trim(),
-      address: String(b.address || '').trim().slice(0, 200) || null,
-      region: String(b.region || ''),
+      address: String(b.address || '').trim().slice(0, 200),
+      suburb: '',
+      postcode: '',
+      // Blank means "work it out from the address". Customers can override a wrong guess.
+      region: C.regionName[b.region] ? b.region : '',
       description: String(b.description || '').trim().slice(0, 5000),
       // Each sector has its own extra field on the form; keep only the one that matches.
       requirements: String(b[`requirements_${b.sector}`] || '').trim().slice(0, 2000) || null,
@@ -161,13 +163,17 @@ router.post(
     if (!values.sector) error = 'Pick whether this is for a home, a hotel or a mine site.';
     else if (values.title.length < 6) error = 'Give the job a short title, e.g. "Regrout shower and replace 4 cracked tiles".';
     else if (!C.tradeName[values.trade]) error = 'Pick the trade that best fits the job.';
-    else if (!values.suburb) error = 'Enter the suburb, town or site the job is at.';
-    else if (!/^6\d{3}$/.test(values.postcode)) error = 'Enter a WA postcode (6000–6999).';
-    else if (!C.regionName[values.region]) error = 'Pick the area the job is in.';
     else if (values.sector === 'mining' && !values.requirements) error = 'Add the site requirements so tradies know what they need before quoting.';
     else if (values.description.length < 30) error = 'Describe the job in a bit more detail so tradies can price it properly.';
+    else if (!values.address) error = 'Enter the address of the job. Only the suburb is shown publicly.';
     else if (!C.budgetName[values.budget]) error = 'Pick a rough budget.';
     else if (!C.timingName[values.timing]) error = 'Pick when you need it done.';
+
+    if (!error) {
+      const place = locate(values.address);
+      if (place.error) error = errorMessage(place);
+      else Object.assign(values, { suburb: place.suburb, postcode: place.postcode, region: values.region || place.region });
+    }
 
     if (error) {
       removeUploads(req.files);
@@ -184,6 +190,13 @@ router.post(
     res.redirect(`/jobs/${id}`);
   },
 );
+
+// Live preview on the job form: shows what will be public before the job is posted.
+router.get('/api/locate', (req, res) => {
+  const place = locate(String(req.query.address || '').slice(0, 200));
+  if (place.error) return res.json({ ok: false, message: place.error === 'empty' ? '' : errorMessage(place) });
+  res.json({ ok: true, suburb: place.suburb, region: place.region, regionName: C.regionName[place.region] });
+});
 
 // ---- Job page ----
 
@@ -220,7 +233,7 @@ router.get('/jobs/:id', loadJob, (req, res) => {
   ];
   res.render('pages/job', {
     title: `${job.title}, ${job.suburb}`,
-    description: seo.truncate(`${C.tradeName[job.trade]} job in ${job.suburb} ${job.postcode}. ${job.description}`),
+    description: seo.truncate(`${C.tradeName[job.trade]} job in ${job.suburb}. ${job.description}`),
     breadcrumbs: job.trade === 'other' ? null : crumbs,
     jsonld: job.trade === 'other' ? [] : [seo.breadcrumbList(crumbs)],
     job,

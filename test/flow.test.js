@@ -101,8 +101,8 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
     'base64',
   );
   res = await customer.form('/jobs', {
-    sector: 'housing', title: 'Regrout shower', trade: 'tiling', suburb: 'Bayswater', postcode: '6053', region: 'eastern',
-    address: '1 Test St', description: 'Shower grout cracking and four floor tiles need replacing.',
+    sector: 'housing', title: 'Regrout shower', trade: 'tiling', address: '1 Test St, Bayswater WA 6053', region: 'eastern',
+    description: 'Shower grout cracking and four floor tiles need replacing.',
     budget: '500-2k', timing: 'two-weeks', photos: new Blob([png], { type: 'image/png' }),
   });
   assert.strictEqual(res.status, 302);
@@ -113,8 +113,8 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   // Mining jobs must say what's needed to get on site.
   await customer.get('/jobs/new?sector=mining');
   const miningJob = {
-    sector: 'mining', title: 'Replace air con in six camp rooms', trade: 'aircon', suburb: 'Newman',
-    postcode: '6753', region: 'pilbara', description: 'Six split systems in the camp have failed and need replacing.',
+    sector: 'mining', title: 'Replace air con in six camp rooms', trade: 'aircon',
+    address: 'Village camp, Newman WA 6753', description: 'Six split systems in the camp have failed and need replacing.',
     budget: '10k-50k', timing: 'month',
   };
   res = await customer.form('/jobs', miningJob);
@@ -132,11 +132,23 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
     assert.strictEqual((await browser().get(page)).status, 200);
   }
 
+  // The area is worked out from the address when the customer doesn't pick one.
+  assert.deepStrictEqual(
+    db.prepare('SELECT suburb, postcode, region FROM jobs WHERE id = ?').get(Number(miningUrl.split('/').pop())),
+    { suburb: 'Newman', postcode: '6753', region: 'pilbara' },
+  );
+  // An address with no recognisable suburb is rejected with a helpful message.
+  res = await customer.form('/jobs', { ...miningJob, requirements_mining: 'Induction', address: '12 Nowhere St' });
+  assert.strictEqual(res.status, 400);
+  assert.match(res.text, /Include the suburb and postcode/);
+
   // Public board shows it, but not the private address.
   res = await browser().get('/jobs');
   assert.match(res.text, /Regrout shower/);
   res = await browser().get(jobUrl);
   assert.doesNotMatch(res.text, /1 Test St/);
+  assert.doesNotMatch(res.text, /6053/);
+  assert.match(res.text, /Bayswater/);
 
   // Unapproved tradie can't quote.
   await tradie.get(jobUrl);

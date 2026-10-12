@@ -151,7 +151,7 @@
             <% if (job.customer_company) { %><dt>Business</dt><dd><%= job.customer_company %></dd><% } %>
             <% if (job.customer_phone) { %><dt>Phone</dt><dd><a href="tel:<%= job.customer_phone.replace(/\s/g, '') %>"><%= job.customer_phone %></a></dd><% } %>
             <dt>Email</dt><dd><a href="mailto:<%= job.customer_email %>"><%= job.customer_email %></a></dd>
-            <dt>Address</dt><dd><%= job.address || 'Not given. Ask the customer.' %>, <%= job.suburb %> <%= job.postcode %></dd>
+            <dt>Address</dt><dd><%= job.address || `${job.suburb} ${job.postcode}. Ask the customer for the street address.` %></dd>
           </dl>
         </div>
         <div class="box" style="margin-bottom:32px">
@@ -238,7 +238,8 @@
           <dt>Job</dt><dd class="mono">#<%= jobNo %></dd>
           <dt>Type</dt><dd><%= sectorName[job.sector] %></dd>
           <dt>Trade</dt><dd><%= tradeName[job.trade] %></dd>
-          <dt>Location</dt><dd><%= job.suburb %> <%= job.postcode %></dd>
+          <dt>Location</dt><dd><%= job.suburb %></dd>
+          <% if (isOwner && job.address) { %><dt>Address</dt><dd><%= job.address %><br><span class="small muted">Only you and the tradie you accept see this</span></dd><% } %>
           <dt>Area</dt><dd><%= regionName[job.region] %></dd>
           <dt>Budget</dt><dd><%= budgetName[job.budget] %></dd>
           <dt>Timing</dt><dd><%= timingName[job.timing] %></dd>
