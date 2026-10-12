@@ -1,0 +1,105 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <h1>Post a job</h1>
+    <p>The more detail you give, the more accurate the quotes. It's free, and you don't have to accept any of them.</p>
+  </div>
+
+  <div class="with-side page" style="padding-top:0">
+    <form method="post" action="/jobs" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <% if (typeof error !== 'undefined') { %><div class="notice error"><%= error %></div><% } %>
+
+      <div class="field">
+        <label for="title">What needs doing?</label>
+        <input id="title" name="title" type="text" maxlength="120" required value="<%= values.title || '' %>" placeholder="e.g. Fix leaking kitchen tap and replace mixer">
+      </div>
+
+      <div class="field">
+        <label for="trade">Type of work</label>
+        <select id="trade" name="trade" required>
+          <option value="">Choose one</option>
+          <% TRADES.forEach(t => { %><option value="<%= t.slug %>" <%= values.trade === t.slug ? 'selected' : '' %>><%= t.name %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="description">Details
+          <span class="hint">Sizes, materials, access, anything that's already been tried. Don't put your phone number or address here.</span>
+        </label>
+        <textarea id="description" name="description" maxlength="5000" required placeholder="e.g. Bathroom about 2.4m x 1.8m. Grout in the shower is cracking and there's a damp patch on the wall behind it. Four floor tiles near the vanity are cracked. I have a few spare tiles from when it was laid."><%= values.description || '' %></textarea>
+      </div>
+
+      <div class="field">
+        <label for="photos">Photos <span class="hint" style="display:inline">(optional, up to 6)</span></label>
+        <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
+        <span class="hint">JPG, PNG or HEIC, max 8MB each. If you got an error, add the photos again.</span>
+      </div>
+
+      <hr>
+
+      <div class="row">
+        <div class="field">
+          <label for="suburb">Suburb</label>
+          <input id="suburb" name="suburb" type="text" required value="<%= values.suburb || '' %>" placeholder="e.g. Morley">
+        </div>
+        <div class="field">
+          <label for="postcode">Postcode</label>
+          <input id="postcode" name="postcode" type="text" inputmode="numeric" pattern="6[0-9]{3}" maxlength="4" required value="<%= values.postcode || '' %>" placeholder="6062">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="region">Area of Perth</label>
+        <select id="region" name="region" required>
+          <option value="">Choose one</option>
+          <% REGIONS.forEach(r => { %><option value="<%= r.slug %>" <%= values.region === r.slug ? 'selected' : '' %>><%= r.name %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="address">Street address <span class="hint" style="display:inline">(optional)</span></label>
+        <input id="address" name="address" type="text" autocomplete="street-address" value="<%= values.address || '' %>">
+        <span class="hint">Kept private. Only the tradie you accept will see it.</span>
+      </div>
+
+      <hr>
+
+      <div class="row">
+        <div class="field">
+          <label for="budget">Rough budget</label>
+          <select id="budget" name="budget" required>
+            <option value="">Choose one</option>
+            <% BUDGETS.forEach(b => { %><option value="<%= b.slug %>" <%= values.budget === b.slug ? 'selected' : '' %>><%= b.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="timing">When</label>
+          <select id="timing" name="timing" required>
+            <option value="">Choose one</option>
+            <% TIMINGS.forEach(t => { %><option value="<%= t.slug %>" <%= values.timing === t.slug ? 'selected' : '' %>><%= t.name %></option><% }) %>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn accent big">Post job</button>
+    </form>
+
+    <aside>
+      <div class="box">
+        <h3>What happens next</h3>
+        <ol class="small" style="padding-left:18px;margin:0;color:var(--ink-2)">
+          <li style="margin-bottom:8px">Tradies who cover your area and trade see the job.</li>
+          <li style="margin-bottom:8px">Quotes show up on your job page. Most come in within a day or two.</li>
+          <li style="margin-bottom:8px">Accept the one you want. Your details are shared with that tradie only.</li>
+          <li>Pay by card. We hold it until you say the job's done.</li>
+        </ol>
+      </div>
+      <div class="box">
+        <h3>Tips for better quotes</h3>
+        <p class="small muted" style="margin:0">Add a wide photo and a close-up. Mention measurements if you have them, and say if there's anything awkward like stairs, a steep roof or no parking.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+<%- include('../partials/foot') %>

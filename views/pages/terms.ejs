@@ -1,0 +1,51 @@
+<%- include('../partials/head') %>
+<div class="wrap narrow page legal">
+  <% if (user && user.role === 'admin') { %>
+    <div class="draft-banner">Draft for review. Get these checked by an Australian lawyer before launch. Only admins see this note.</div>
+  <% } %>
+  <h1>Terms of use</h1>
+  <p class="muted">Last updated <%= new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }) %></p>
+
+  <h2>1. What ezbuild is</h2>
+  <p><%= siteName %> is an online marketplace that connects people who need building, repair and maintenance work done ("customers") with independent tradespeople and businesses ("tradies") in the Perth metropolitan area of Western Australia.</p>
+  <p>We are not a builder or contractor and we don't do any of the work. The contract for the work is between the customer and the tradie. We provide the platform, check tradies' details, and hold payments until jobs are signed off.</p>
+
+  <h2>2. Accounts</h2>
+  <p>You must be 18 or over and give accurate details. You're responsible for keeping your password safe and for anything done using your account. We can suspend or close accounts that break these terms.</p>
+
+  <h2>3. Tradies</h2>
+  <ul>
+    <li>You must hold an active ABN, any licence or registration required by WA law for the work you quote on, and current public liability insurance.</li>
+    <li>Our checks are based on information you give us and public registers at the time. They are not a guarantee of the quality of your work.</li>
+    <li>Quotes must be the full price including GST for the work described. You're responsible for doing the work with due care and skill, safely, and in line with all applicable laws and standards.</li>
+    <li>You agree to pay our service fee of <%= feePercent %>% of the quote amount on each job you win through <%= siteName %>. The fee is deducted from the payment before it's paid out to you.</li>
+    <li>For 12 months after you're introduced to a customer through <%= siteName %>, you agree not to arrange paid work with that customer outside the platform to avoid our fee.</li>
+  </ul>
+
+  <h2>4. Customers</h2>
+  <ul>
+    <li>Job descriptions must be accurate. Don't include your contact details in the public description.</li>
+    <li>Accepting a quote means you intend to go ahead with the work at that price. You'll then be asked to pay.</li>
+    <li>Only release payment once the work is complete. Releasing payment tells us the job has been done to your satisfaction.</li>
+  </ul>
+
+  <h2>5. Payments</h2>
+  <p>Payments are processed by Stripe. When a customer pays for an accepted quote, we hold the funds until the customer releases them, or until we decide a dispute. Tradies receive payouts to the bank account connected to their Stripe account, which is subject to Stripe's own terms.</p>
+  <p>If a job doesn't go ahead or there's a dispute before payment is released, contact us. We may refund the customer, release the payment to the tradie, or split it, based on the information both parties give us. We'll act reasonably and in good faith, but we are not a court or tribunal, and either party may still take the matter to Consumer Protection WA, the State Administrative Tribunal or another appropriate body.</p>
+
+  <h2>6. Reviews</h2>
+  <p>Only customers who've paid for a job through <%= siteName %> can review the tradie. Reviews must be honest and about the job. We may remove reviews that are abusive, false or break the law.</p>
+
+  <h2>7. Our liability</h2>
+  <p>Nothing in these terms excludes rights you have under the Australian Consumer Law. To the extent allowed by law, we aren't liable for the work done by tradies, or for loss arising from dealings between customers and tradies. Where our liability can't be excluded but can be limited, it is limited to resupplying our service or the fees we received for the job concerned.</p>
+
+  <h2>8. Changes</h2>
+  <p>We may update these terms. We'll let registered users know about significant changes by email.</p>
+
+  <h2>9. Law</h2>
+  <p>These terms are governed by the laws of Western Australia.</p>
+
+  <h2>Contact</h2>
+  <p><a href="mailto:<%= supportEmail %>"><%= supportEmail %></a></p>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,36 @@
+<%- include('../partials/head') %>
+<div class="wrap narrow page legal">
+  <% if (user && user.role === 'admin') { %>
+    <div class="draft-banner">Draft for review. Get this checked before launch. Only admins see this note.</div>
+  <% } %>
+  <h1>Privacy</h1>
+  <p class="muted">Last updated <%= new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }) %></p>
+
+  <p>This explains what personal information <%= siteName %> collects, why, and what we do with it. We handle personal information in line with the Australian Privacy Principles.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Everyone:</strong> name, email, mobile number and password (stored encrypted).</li>
+    <li><strong>Customers:</strong> job details, photos, suburb, postcode and, if you give it, street address.</li>
+    <li><strong>Tradies:</strong> business name, ABN, trades, service areas, licence number and insurance details.</li>
+    <li><strong>Payments:</strong> handled by Stripe. We never see or store full card or bank account numbers.</li>
+  </ul>
+
+  <h2>Who sees what</h2>
+  <ul>
+    <li>Job titles, descriptions, photos, suburb and postcode are visible to anyone browsing jobs.</li>
+    <li>Your name, phone, email and street address are only shared with the other party once a quote is accepted.</li>
+    <li>Tradies' business names, trades, areas, licence numbers and reviews appear on their public profile. ABN and insurance details are only seen by us.</li>
+    <li>We share information with Stripe to process payments and payouts, and with our hosting provider to run the site. We don't sell your information.</li>
+  </ul>
+
+  <h2>How long we keep it</h2>
+  <p>While your account is open, and afterwards for as long as we need to for tax, legal or dispute reasons.</p>
+
+  <h2>Your choices</h2>
+  <p>You can ask to see or correct your information, or to close your account, by emailing <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a>. If you're unhappy with how we've handled your information, tell us first. You can also contact the Office of the Australian Information Commissioner (oaic.gov.au).</p>
+
+  <h2>Cookies</h2>
+  <p>We use one cookie to keep you logged in. No advertising or tracking cookies.</p>
+</div>
+<%- include('../partials/foot') %>

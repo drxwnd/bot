@@ -1,0 +1,99 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <h1>Business details</h1>
+    <p>We check these before you can quote. Customers see your business name, trades, years trading and reviews. Your ABN and insurance details are only seen by us.</p>
+  </div>
+
+  <div class="with-side page" style="padding-top:0">
+    <form method="post" action="/dashboard/profile">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <% if (typeof error !== 'undefined') { %><div class="notice error"><%= error %></div><% } %>
+
+      <div class="row">
+        <div class="field">
+          <label for="name">Your name</label>
+          <input id="name" name="name" type="text" required value="<%= values.name || '' %>">
+        </div>
+        <div class="field">
+          <label for="phone">Mobile</label>
+          <input id="phone" name="phone" type="tel" required value="<%= values.phone || '' %>">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="business_name">Business / trading name</label>
+          <input id="business_name" name="business_name" type="text" required value="<%= values.business_name || '' %>">
+        </div>
+        <div class="field">
+          <label for="abn">ABN</label>
+          <input id="abn" name="abn" type="text" inputmode="numeric" required value="<%= values.abn ? formatAbn(values.abn) : '' %>" placeholder="11 digits">
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Trades <span class="hint" style="display:inline">(pick all that apply)</span></span>
+        <div class="checks">
+          <% TRADES.filter(t => t.slug !== 'other').forEach(t => { %>
+            <label><input type="checkbox" name="trades" value="<%= t.slug %>" <%= values.trades.includes(t.slug) ? 'checked' : '' %>> <%= t.name %></label>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Areas you'll travel to</span>
+        <div class="checks">
+          <% REGIONS.forEach(r => { %>
+            <label><input type="checkbox" name="regions" value="<%= r.slug %>" <%= values.regions.includes(r.slug) ? 'checked' : '' %>> <%= r.name %></label>
+          <% }) %>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="field">
+        <label for="licence_no">Licence number
+          <span class="hint">Required for electrical, plumbing, gas and building work over $20,000 in WA. Leave blank if your trade doesn't need one.</span>
+        </label>
+        <input id="licence_no" name="licence_no" type="text" value="<%= values.licence_no || '' %>">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="insurer">Public liability insurer</label>
+          <input id="insurer" name="insurer" type="text" required value="<%= values.insurer || '' %>" placeholder="e.g. QBE, Allianz">
+        </div>
+        <div class="field">
+          <label for="insurance_expiry">Policy expiry</label>
+          <input id="insurance_expiry" name="insurance_expiry" type="date" required value="<%= values.insurance_expiry || '' %>">
+        </div>
+      </div>
+      <p class="small muted" style="margin-top:-8px">We may ask you to email a copy of your certificate of currency.</p>
+
+      <div class="field">
+        <label for="years_trading">Years in the trade</label>
+        <input id="years_trading" name="years_trading" type="number" min="0" max="70" style="max-width:140px" value="<%= values.years_trading ?? '' %>">
+      </div>
+
+      <div class="field">
+        <label for="bio">About your business <span class="hint" style="display:inline">(shown on your profile)</span></label>
+        <textarea id="bio" name="bio" maxlength="1500" placeholder="What you do best, how long you've been at it, the kind of jobs you like."><%= values.bio || '' %></textarea>
+      </div>
+
+      <button class="btn accent big">Save details</button>
+    </form>
+
+    <aside>
+      <div class="box">
+        <h3>What we check</h3>
+        <ul class="small" style="padding-left:18px;margin:0;color:var(--ink-2)">
+          <li style="margin-bottom:6px">Your ABN is active, on the ABN Lookup.</li>
+          <li style="margin-bottom:6px">Your licence, on the relevant WA register, if your trade needs one.</li>
+          <li>Your public liability cover is current.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+<%- include('../partials/foot') %>

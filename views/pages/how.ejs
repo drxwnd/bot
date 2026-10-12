@@ -1,0 +1,86 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow">For customers</span>
+    <h1>How it works</h1>
+    <p>For homeowners, renters, landlords and small businesses around Perth. Posting is free, and you're never locked in to a quote.</p>
+  </div>
+
+  <div class="page" style="padding-top:0">
+    <ol class="steps" style="margin-bottom:72px">
+      <li>
+        <h3>Post the job</h3>
+        <p>Tell us what's wrong or what you want built, which suburb, and when. Add photos if you can.</p>
+      </li>
+      <li>
+        <h3>Compare quotes</h3>
+        <p>Tradies who work in your area send a fixed price and what's included. See their reviews and how long they've been trading.</p>
+      </li>
+      <li>
+        <h3>Accept and pay</h3>
+        <p>Pick a quote. You then get each other's contact details to sort out a time. Pay by card and we hold the money.</p>
+      </li>
+      <li>
+        <h3>Release when happy</h3>
+        <p>When the job's done properly, release the payment. Then leave a review so the next person knows who to call.</p>
+      </li>
+    </ol>
+
+    <div class="split" id="payments">
+      <div>
+        <span class="eyebrow">Payment protection</span>
+        <h2>Why we hold the money</h2>
+      </div>
+      <div>
+        <p>Paying a stranger a big deposit and hoping they turn up is how a lot of people get burnt. Tradies have the opposite problem: they finish the job and then chase the invoice for weeks.</p>
+        <p>With ezbuild you pay the agreed price when you accept the quote. The tradie can see it's paid, so they know the money is there. We hold it with Stripe until you confirm the job is done.</p>
+        <p>If something goes wrong, don't release the payment. Email <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a> with your job number and we'll work it out with both of you. Refunds before release go back to your card.</p>
+        <p class="muted small">Your rights under Australian Consumer Law still apply to any work done.</p>
+      </div>
+    </div>
+
+    <hr style="margin:64px 0">
+
+    <div class="split">
+      <div>
+        <span class="eyebrow">Checked tradies</span>
+        <h2>Who can quote</h2>
+      </div>
+      <div>
+        <p>Before a tradie can quote on anything, we check:</p>
+        <ul class="plain-list">
+          <li><strong>ABN</strong><span>Active and matching their business name on the ABN Lookup.</span></li>
+          <li><strong>Licence</strong><span>On the relevant WA register where the trade needs one, such as electrical, plumbing, gas, and building work over $20,000.</span></li>
+          <li><strong>Insurance</strong><span>Current public liability cover.</span></li>
+        </ul>
+        <p style="margin-top:20px">Reviews can only be left by customers who've paid for a job through ezbuild, so they can't be faked by friends and family.</p>
+      </div>
+    </div>
+
+    <hr style="margin:64px 0">
+
+    <div class="narrow">
+      <h2>Common questions</h2>
+      <div class="faq" style="margin-top:20px">
+        <details>
+          <summary>Do I have to accept a quote?</summary>
+          <p>No. If none of them suit, close the job. It costs nothing.</p>
+        </details>
+        <details>
+          <summary>What if the tradie needs to check the job in person first?</summary>
+          <p>That's normal for bigger jobs. They'll say so in their quote. Once you accept, you'll have each other's contact details to arrange a visit. If the price changes after they've seen it, they can send an updated quote before you pay.</p>
+        </details>
+        <details>
+          <summary>Are the prices including GST?</summary>
+          <p>Yes. Tradies quote the full price you'll pay.</p>
+        </details>
+        <details>
+          <summary>How do I pay?</summary>
+          <p>By card through Stripe. Visa, Mastercard, Amex, Apple Pay and Google Pay all work.</p>
+        </details>
+      </div>
+      <p style="margin-top:40px"><a class="btn accent big" href="/jobs/new">Post a job</a></p>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

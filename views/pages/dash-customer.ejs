@@ -1,0 +1,38 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head" style="display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap">
+    <div>
+      <span class="eyebrow">G'day <%= user.name.split(' ')[0] %></span>
+      <h1>Your jobs</h1>
+    </div>
+    <a class="btn accent" href="/jobs/new">Post a new job</a>
+  </div>
+
+  <div class="page" style="padding-top:0">
+    <% if (!jobs.length) { %>
+      <div class="empty">
+        <strong>You haven't posted any jobs yet.</strong>
+        <p style="margin:6px 0 18px">It takes a couple of minutes and costs nothing.</p>
+        <a class="btn" href="/jobs/new">Post your first job</a>
+      </div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Job</th><th>Suburb</th><th>Status</th><th class="num">Quotes</th><th>Posted</th></tr></thead>
+          <tbody>
+            <% jobs.forEach(j => { %>
+              <tr>
+                <td><span class="mono muted">#<%= String(j.id).padStart(4, '0') %></span>&nbsp; <a href="/jobs/<%= j.id %>"><%= j.title %></a></td>
+                <td><%= j.suburb %></td>
+                <td><span class="tag <%= j.status %>"><%= STATUS_LABEL[j.status] %></span></td>
+                <td class="num"><%= j.quote_count %></td>
+                <td class="muted"><%= ago(j.created_at) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('../partials/foot') %>

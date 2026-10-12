@@ -1,0 +1,154 @@
+const express = require('express');
+const db = require('../db');
+const C = require('../constants');
+const payments = require('../payments');
+const { validAbn, list } = require('../helpers');
+const { flash, requireLogin, requireRole } = require('../middleware');
+
+const router = express.Router();
+
+const q = {
+  customerJobs: db.prepare(`
+    SELECT j.*,
+      (SELECT COUNT(*) FROM quotes WHERE job_id = j.id AND status != 'withdrawn') AS quote_count
+    FROM jobs j WHERE j.customer_id = ? ORDER BY j.status = 'cancelled', j.created_at DESC`),
+  tradieQuotes: db.prepare(`
+    SELECT q.*, j.title, j.suburb, j.status AS job_status, j.accepted_quote_id,
+      p.status AS payment_status
+    FROM quotes q JOIN jobs j ON j.id = q.job_id LEFT JOIN payments p ON p.job_id = j.id
+    WHERE q.tradie_id = ? AND q.status != 'withdrawn' ORDER BY q.created_at DESC`),
+  matchingJobs: db.prepare(`
+    SELECT id, title, trade, suburb, region, budget, created_at FROM jobs
+    WHERE status = 'open'
+      AND (',' || ? || ',') LIKE ('%,' || trade || ',%')
+      AND (',' || ? || ',') LIKE ('%,' || region || ',%')
+      AND id NOT IN (SELECT job_id FROM quotes WHERE tradie_id = ?)
+    ORDER BY created_at DESC LIMIT 10`),
+  earnings: db.prepare(`
+    SELECT COALESCE(SUM(p.amount_cents - p.fee_cents), 0) AS paid_out
+    FROM payments p JOIN quotes q ON q.id = p.quote_id
+    WHERE q.tradie_id = ? AND p.status = 'released'`),
+  upsertProfile: db.prepare(`
+    INSERT INTO tradie_profiles (user_id, business_name, abn, trades, regions, licence_no, insurer, insurance_expiry, years_trading, bio)
+    VALUES (@user_id, @business_name, @abn, @trades, @regions, @licence_no, @insurer, @insurance_expiry, @years_trading, @bio)
+    ON CONFLICT (user_id) DO UPDATE SET
+      business_name = excluded.business_name, abn = excluded.abn, trades = excluded.trades,
+      regions = excluded.regions, licence_no = excluded.licence_no, insurer = excluded.insurer,
+      insurance_expiry = excluded.insurance_expiry, years_trading = excluded.years_trading, bio = excluded.bio`),
+  updateUser: db.prepare('UPDATE users SET name = ?, phone = ? WHERE id = ?'),
+};
+
+router.get('/dashboard', requireLogin, (req, res) => {
+  const user = req.user;
+  if (user.role === 'admin') return res.redirect('/admin');
+
+  if (user.role === 'customer') {
+    return res.render('pages/dash-customer', { title: 'Your jobs', jobs: q.customerJobs.all(user.id) });
+  }
+
+  const profile = user.profile;
+  res.render('pages/dash-tradie', {
+    title: 'Dashboard',
+    profile,
+    quotes: q.tradieQuotes.all(user.id),
+    matches: profile && profile.status === 'approved' ? q.matchingJobs.all(profile.trades, profile.regions, user.id) : [],
+    paidOut: q.earnings.get(user.id).paid_out,
+  });
+});
+
+// ---- Tradie business profile ----
+
+router.get('/dashboard/profile', requireRole('tradie'), (req, res) => {
+  const p = req.user.profile;
+  const values = p
+    ? { ...p, trades: p.trades.split(','), regions: p.regions.split(','), name: req.user.name, phone: req.user.phone }
+    : { trades: [], regions: [], name: req.user.name, phone: req.user.phone };
+  res.render('pages/profile-edit', { title: 'Business details', values });
+});
+
+router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
+  const b = req.body;
+  const values = {
+    user_id: req.user.id,
+    name: String(b.name || '').trim(),
+    phone: String(b.phone || '').trim(),
+    business_name: String(b.business_name || '').trim().slice(0, 100),
+    abn: String(b.abn || '').replace(/\s/g, ''),
+    trades: list(b.trades).filter((t) => C.tradeName[t]),
+    regions: list(b.regions).filter((r) => C.regionName[r]),
+    licence_no: String(b.licence_no || '').trim().slice(0, 50) || null,
+    insurer: String(b.insurer || '').trim().slice(0, 100) || null,
+    insurance_expiry: /^\d{4}-\d{2}-\d{2}$/.test(b.insurance_expiry || '') ? b.insurance_expiry : null,
+    years_trading: Number.isInteger(Number(b.years_trading)) && b.years_trading !== '' ? Number(b.years_trading) : null,
+    bio: String(b.bio || '').trim().slice(0, 1500) || null,
+  };
+
+  let error = null;
+  if (!values.name) error = 'Enter your name.';
+  else if (!values.business_name) error = 'Enter your business or trading name.';
+  else if (!validAbn(values.abn)) error = "That ABN doesn't look right. Check it on abr.business.gov.au.";
+  else if (!values.trades.length) error = 'Pick at least one trade.';
+  else if (!values.regions.length) error = "Pick the areas you'll travel to.";
+  else if (!values.insurer || !values.insurance_expiry) error = 'We need your public liability insurer and expiry date.';
+
+  if (error) return res.status(400).render('pages/profile-edit', { title: 'Business details', values, error });
+
+  db.transaction(() => {
+    q.updateUser.run(values.name, values.phone || null, req.user.id);
+    q.upsertProfile.run({ ...values, trades: values.trades.join(','), regions: values.regions.join(',') });
+  })();
+
+  flash(
+    req,
+    'success',
+    req.user.profile && req.user.profile.status === 'approved'
+      ? 'Details saved.'
+      : "Thanks. We'll check your ABN, licence and insurance, usually within one business day.",
+  );
+  res.redirect('/dashboard');
+});
+
+// ---- Payouts ----
+
+router.get('/dashboard/payouts', requireRole('tradie'), async (req, res, next) => {
+  const profile = req.user.profile;
+  if (!profile) return res.redirect('/dashboard/profile');
+  try {
+    const ready = await payments.refreshPayoutStatus(req.user, profile);
+    if (req.query.done && ready) flash(req, 'success', "Payouts are set up. You'll get paid straight to your bank.");
+    if (req.query.done) return res.redirect('/dashboard/payouts');
+    res.render('pages/payouts', {
+      title: 'Payouts',
+      profile,
+      ready,
+      available: payments.available,
+      simulated: payments.simulated,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function startOnboarding(req, res, next) {
+  const profile = req.user.profile;
+  if (!profile) return res.redirect('/dashboard/profile');
+  try {
+    res.redirect(303, await payments.onboardingLink(req.user, profile));
+  } catch (err) {
+    next(err);
+  }
+}
+router.post('/dashboard/payouts/start', requireRole('tradie'), startOnboarding);
+// Stripe sends people back here if an onboarding link expires.
+router.get('/dashboard/payouts/start', requireRole('tradie'), startOnboarding);
+
+router.post('/dashboard/payouts/stripe', requireRole('tradie'), async (req, res, next) => {
+  try {
+    const url = await payments.payoutDashboardLink(req.user.profile || {});
+    res.redirect(303, url || '/dashboard/payouts');
+  } catch (err) {
+    next(err);
+  }
+});
+
+module.exports = router;

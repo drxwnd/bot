@@ -1,0 +1,14 @@
+<a class="job-row" href="/jobs/<%= job.id %>">
+  <span class="n">#<%= String(job.id).padStart(4, '0') %></span>
+  <span class="t"><%= job.title %></span>
+  <span class="r"><%= ago(job.created_at) %></span>
+  <span class="m">
+    <span><%= tradeName[job.trade] %></span>
+    <span><%= job.suburb %></span>
+    <span><%= budgetName[job.budget] %></span>
+    <span><%= job.quote_count %> quote<%= job.quote_count === 1 ? '' : 's' %></span>
+  </span>
+  <% if (typeof showDesc !== 'undefined' && showDesc && job.description) { %>
+    <span class="d"><%= job.description %></span>
+  <% } %>
+</a>

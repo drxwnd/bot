@@ -1,0 +1,45 @@
+<%- include('../partials/head') %>
+<div class="auth">
+  <div class="choice">
+    <a href="/signup<%= next ? '?next=' + encodeURIComponent(next) : '' %>" class="<%= as === 'customer' ? 'on' : '' %>">I need work done</a>
+    <a href="/signup?as=tradie" class="<%= as === 'tradie' ? 'on' : '' %>">I'm a tradie</a>
+  </div>
+
+  <% if (as === 'tradie') { %>
+    <h1>Join as a tradie</h1>
+    <p class="muted">Free to join. After this you'll add your ABN, licence and insurance so we can check you over, usually within a business day.</p>
+  <% } else { %>
+    <h1>Create an account</h1>
+    <p class="muted">So tradies can send you quotes and you can keep track of your jobs. Free, and we don't send spam.</p>
+  <% } %>
+
+  <% if (typeof error !== 'undefined') { %><div class="notice error"><%= error %></div><% } %>
+
+  <form method="post" action="/signup">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="as" value="<%= as %>">
+    <input type="hidden" name="next" value="<%= next %>">
+    <div class="field">
+      <label for="name">Your name</label>
+      <input id="name" name="name" type="text" autocomplete="name" value="<%= values.name || '' %>" required>
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" value="<%= values.email || '' %>" required>
+    </div>
+    <div class="field">
+      <label for="phone">Mobile <% if (as !== 'tradie') { %><span class="hint" style="display:inline">(optional)</span><% } %></label>
+      <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="04xx xxx xxx" value="<%= values.phone || '' %>" <%= as === 'tradie' ? 'required' : '' %>>
+      <span class="hint">Only shared with the <%= as === 'tradie' ? 'customer once they accept your quote' : 'tradie you pick' %>.</span>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+      <span class="hint">At least 8 characters.</span>
+    </div>
+    <button class="btn accent block big"><%= as === 'tradie' ? 'Continue' : 'Create account' %></button>
+    <p class="small muted" style="margin-top:14px">By signing up you agree to our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
+  </form>
+  <p class="alt">Already have an account? <a href="/login<%= next ? '?next=' + encodeURIComponent(next) : '' %>">Log in</a></p>
+</div>
+<%- include('../partials/foot') %>

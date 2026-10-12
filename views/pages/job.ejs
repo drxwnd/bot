@@ -1,0 +1,259 @@
+<%- include('../partials/head') %>
+<%
+  const jobNo = String(job.id).padStart(4, '0');
+  const stage = { open: 1, awarded: 2, paid: 3, completed: 4, cancelled: 0 }[job.status];
+  const showProgress = (isOwner || isAwardedTradie) && job.status !== 'cancelled';
+  const stepClass = (n) => stage > n ? 'done' : stage === n ? 'now' : '';
+%>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow">Job #<%= jobNo %> &middot; posted <%= ago(job.created_at) %></span>
+    <h1><%= job.title %></h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <span class="tag <%= job.status %>"><%= STATUS_LABEL[job.status] %></span>
+      <span class="tag"><%= tradeName[job.trade] %></span>
+    </div>
+  </div>
+
+  <% if (showProgress) { %>
+    <div class="progress">
+      <div class="<%= stepClass(1) %>">Taking quotes</div>
+      <div class="<%= stepClass(2) %>">Quote accepted</div>
+      <div class="<%= stepClass(3) %>">Paid, money held</div>
+      <div class="<%= stage === 4 ? 'done' : '' %>">Signed off</div>
+    </div>
+  <% } %>
+
+  <div class="with-side page" style="padding-top:0">
+    <div>
+      <% if (justPaid && isOwner) { %>
+        <div class="notice success">Payment received. We're holding it until you confirm the job's done. The tradie has been told the money is there.</div>
+      <% } %>
+
+      <%# ---------- Customer: winning tradie + payment ---------- %>
+      <% if (isOwner && awardedTradie) { %>
+        <div class="contact">
+          <h3>Your tradie</h3>
+          <dl class="kv">
+            <dt>Business</dt><dd><a href="/tradies/<%= awardedTradie.tradie_id %>"><%= awardedTradie.business_name %></a></dd>
+            <dt>Contact</dt><dd><%= awardedTradie.tradie_name %></dd>
+            <% if (awardedTradie.tradie_phone) { %><dt>Phone</dt><dd><a href="tel:<%= awardedTradie.tradie_phone.replace(/\s/g, '') %>"><%= awardedTradie.tradie_phone %></a></dd><% } %>
+            <dt>Email</dt><dd><a href="mailto:<%= awardedTradie.tradie_email %>"><%= awardedTradie.tradie_email %></a></dd>
+            <dt>Price</dt><dd class="mono"><%= money(awardedTradie.amount_cents) %></dd>
+          </dl>
+        </div>
+
+        <div id="payment" class="box" style="margin-bottom:32px">
+          <% if (job.status === 'awarded') { %>
+            <h3>Pay <%= money(awardedTradie.amount_cents) %> to lock it in</h3>
+            <p class="small muted">We hold the money. The tradie can see it's been paid, but they don't receive it until you confirm the job is done.</p>
+            <% if (paymentsAvailable) { %>
+              <form method="post" action="/jobs/<%= job.id %>/pay">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="btn accent">Pay by card</button>
+              </form>
+              <% if (simulatedPayments) { %><p class="small muted" style="margin:10px 0 0">Test mode: no card will be charged.</p><% } %>
+            <% } else { %>
+              <div class="notice info" style="margin:0">Online payment isn't switched on yet. Email <%= supportEmail %> and we'll send an invoice.</div>
+            <% } %>
+          <% } else if (job.status === 'paid' && payment) { %>
+            <h3><%= money(payment.amount_cents) %> held</h3>
+            <p class="small muted">Paid <%= shortDate(payment.paid_at) %>. When the work is finished and you're happy with it, release the payment to the tradie. This can't be undone.</p>
+            <form method="post" action="/jobs/<%= job.id %>/release" data-confirm="Release <%= money(payment.amount_cents) %> to <%= awardedTradie.business_name %>? Only do this once the job is finished.">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <button class="btn">Job's done, release payment</button>
+            </form>
+            <p class="small muted" style="margin:12px 0 0">Problem with the work? Don't release. Email <a href="mailto:<%= supportEmail %>?subject=Job %23<%= jobNo %>"><%= supportEmail %></a> and we'll help sort it out.</p>
+          <% } else if (job.status === 'completed' && payment) { %>
+            <h3>Paid and signed off</h3>
+            <p class="small muted" style="margin:0"><%= money(payment.amount_cents) %> released to the tradie on <%= shortDate(payment.released_at) %>.</p>
+          <% } %>
+        </div>
+
+        <% if (job.status === 'completed') { %>
+          <div id="review" style="margin-bottom:40px">
+            <% if (review) { %>
+              <h2 style="font-size:1.4rem">Your review</h2>
+              <p><span class="stars-static" style="color:var(--accent)"><%= '★'.repeat(review.rating) %><%= '☆'.repeat(5 - review.rating) %></span></p>
+              <% if (review.comment) { %><p class="prose"><%= review.comment %></p><% } %>
+            <% } else { %>
+              <h2 style="font-size:1.4rem">How did they go?</h2>
+              <form method="post" action="/jobs/<%= job.id %>/review" class="box">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <div class="field">
+                  <span class="label">Rating</span>
+                  <div class="stars">
+                    <% for (let i = 5; i >= 1; i--) { %>
+                      <input type="radio" id="r<%= i %>" name="rating" value="<%= i %>" required><label for="r<%= i %>" title="<%= i %> star<%= i > 1 ? 's' : '' %>">★</label>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="comment">Comments <span class="hint" style="display:inline">(optional)</span></label>
+                  <textarea id="comment" name="comment" style="min-height:100px" placeholder="Were they on time? Tidy? Would you use them again?"></textarea>
+                </div>
+                <button class="btn">Post review</button>
+              </form>
+            <% } %>
+          </div>
+        <% } %>
+      <% } %>
+
+      <%# ---------- Customer: quotes ---------- %>
+      <% if (isOwner) { %>
+        <h2 style="font-size:1.4rem">Quotes <span class="muted mono" style="font-size:0.9rem">(<%= quotes.length %>)</span></h2>
+        <% if (!quotes.length && job.status === 'open') { %>
+          <div class="empty" style="margin-bottom:40px">
+            <strong>No quotes yet.</strong>
+            Tradies in your area have been shown the job. Most quotes come in within a day or two.
+          </div>
+        <% } %>
+        <% quotes.forEach(qt => { %>
+          <div class="quote <%= qt.status %>">
+            <div class="quote-head">
+              <div>
+                <h3><a href="/tradies/<%= qt.tradie_id %>" style="text-decoration:none"><%= qt.business_name %></a></h3>
+                <div class="small muted">
+                  <% if (qt.review_count) { %><span style="color:var(--accent)">★</span> <%= qt.rating %> (<%= qt.review_count %>) &middot; <% } else { %>New on ezbuild &middot; <% } %>
+                  <% if (qt.years_trading) { %><%= qt.years_trading %> yrs trading &middot; <% } %>
+                  Insured<% if (qt.licence_no) { %> &middot; Licensed<% } %>
+                </div>
+              </div>
+              <div class="quote-amt"><%= money(qt.amount_cents) %></div>
+            </div>
+            <div class="quote-body prose"><%= qt.message %></div>
+            <div class="quote-foot">
+              <span>
+                <% if (qt.start_date) { %>Can start <%= new Date(qt.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %> &middot; <% } %>
+                Sent <%= ago(qt.created_at) %> &middot; inc. GST
+              </span>
+              <% if (job.status === 'open' && qt.status === 'pending') { %>
+                <form method="post" action="/quotes/<%= qt.id %>/accept" data-confirm="Accept this quote for <%= money(qt.amount_cents) %>? Other quotes will be declined.">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <button class="btn small">Accept quote</button>
+                </form>
+              <% } else { %>
+                <span class="tag <%= qt.status %>"><%= qt.status %></span>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+        <hr>
+      <% } %>
+
+      <%# ---------- Winning tradie ---------- %>
+      <% if (isAwardedTradie) { %>
+        <div class="contact">
+          <h3>Customer details</h3>
+          <dl class="kv">
+            <dt>Name</dt><dd><%= job.customer_name %></dd>
+            <% if (job.customer_phone) { %><dt>Phone</dt><dd><a href="tel:<%= job.customer_phone.replace(/\s/g, '') %>"><%= job.customer_phone %></a></dd><% } %>
+            <dt>Email</dt><dd><a href="mailto:<%= job.customer_email %>"><%= job.customer_email %></a></dd>
+            <dt>Address</dt><dd><%= job.address || 'Not given. Ask the customer.' %>, <%= job.suburb %> <%= job.postcode %></dd>
+          </dl>
+        </div>
+        <div class="box" style="margin-bottom:32px">
+          <% if (job.status === 'awarded') { %>
+            <h3>Waiting on payment</h3>
+            <p class="small muted" style="margin:0">The customer accepted your quote of <%= money(accepted.amount_cents) %> and has been asked to pay. We'll hold it until the job's done. Best not to start until this page shows it's paid.</p>
+          <% } else if (job.status === 'paid') { %>
+            <h3>Paid. <%= money(accepted.amount_cents) %> held for you.</h3>
+            <p class="small muted" style="margin:0">Go ahead with the job. When the customer signs it off you'll get <strong><%= money(accepted.amount_cents - feeFor(accepted.amount_cents)) %></strong> paid out to your bank<% if (!user.profile.payouts_enabled) { %>. <a href="/dashboard/payouts">Set up payouts</a> first so there's no delay<% } %>.</p>
+          <% } else if (job.status === 'completed') { %>
+            <h3>Job complete</h3>
+            <p class="small muted" style="margin:0"><%= money(accepted.amount_cents - feeFor(accepted.amount_cents)) %> has been sent to your Stripe account. It usually lands in your bank within 2 business days.</p>
+          <% } %>
+        </div>
+      <% } %>
+
+      <%# ---------- Job details (everyone) ---------- %>
+      <h2 style="font-size:1.4rem">Job details</h2>
+      <p class="prose"><%= job.description %></p>
+      <% if (photos.length) { %>
+        <div class="photos">
+          <% photos.forEach(p => { %><a href="/uploads/<%= p.filename %>" target="_blank" rel="noopener"><img src="/uploads/<%= p.filename %>" alt="Photo of the job" loading="lazy"></a><% }) %>
+        </div>
+      <% } %>
+
+      <%# ---------- Tradie quoting ---------- %>
+      <% if (isTradie && !isAwardedTradie) { %>
+        <div id="quote" style="margin-top:40px">
+          <% if (!user.profile || user.profile.status !== 'approved') { %>
+            <div class="notice info">You'll be able to quote once your account has been checked. <a href="/dashboard">See your status</a>.</div>
+          <% } else if (myQuote && myQuote.status !== 'withdrawn') { %>
+            <h2 style="font-size:1.4rem">Your quote</h2>
+            <div class="quote <%= myQuote.status %>">
+              <div class="quote-head"><div><span class="tag <%= myQuote.status %>"><%= myQuote.status %></span></div><div class="quote-amt"><%= money(myQuote.amount_cents) %></div></div>
+              <div class="quote-body prose"><%= myQuote.message %></div>
+              <div class="quote-foot">
+                <span>You'd receive <%= money(myQuote.amount_cents - feeFor(myQuote.amount_cents)) %> after the <%= feePercent %>% fee</span>
+                <% if (myQuote.status === 'pending') { %>
+                  <form method="post" action="/quotes/<%= myQuote.id %>/withdraw">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <button class="linkish danger small">Withdraw</button>
+                  </form>
+                <% } %>
+              </div>
+            </div>
+            <% if (myQuote.status === 'pending') { %><p class="small muted">Need to change it? Send a new quote below and it'll replace this one.</p><% } %>
+          <% } %>
+
+          <% if (user.profile && user.profile.status === 'approved' && job.status === 'open' && (!myQuote || myQuote.status !== 'declined')) { %>
+            <h2 style="font-size:1.4rem;margin-top:24px"><%= myQuote && myQuote.status === 'pending' ? 'Update your quote' : 'Send a quote' %></h2>
+            <form method="post" action="/jobs/<%= job.id %>/quotes" class="box">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <div class="row">
+                <div class="field">
+                  <label for="amount">Your price (AUD, inc. GST)</label>
+                  <input id="amount" name="amount" type="text" inputmode="decimal" required placeholder="e.g. 850">
+                </div>
+                <div class="field">
+                  <label for="start_date">Earliest start <span class="hint" style="display:inline">(optional)</span></label>
+                  <input id="start_date" name="start_date" type="date">
+                </div>
+              </div>
+              <div class="field">
+                <label for="message">What's included
+                  <span class="hint">Materials, how long it'll take, warranty, anything you'd need to check on site.</span>
+                </label>
+                <textarea id="message" name="message" required style="min-height:120px"></textarea>
+              </div>
+              <button class="btn accent">Send quote</button>
+              <span class="small muted" style="margin-left:12px">No charge to quote. <%= feePercent %>% only if you win and get paid.</span>
+            </form>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <aside>
+      <div class="box">
+        <dl class="kv">
+          <dt>Job</dt><dd class="mono">#<%= jobNo %></dd>
+          <dt>Trade</dt><dd><%= tradeName[job.trade] %></dd>
+          <dt>Suburb</dt><dd><%= job.suburb %> <%= job.postcode %></dd>
+          <dt>Area</dt><dd><%= regionName[job.region] %></dd>
+          <dt>Budget</dt><dd><%= budgetName[job.budget] %></dd>
+          <dt>Timing</dt><dd><%= timingName[job.timing] %></dd>
+          <dt>Posted</dt><dd><%= shortDate(job.created_at) %></dd>
+        </dl>
+      </div>
+
+      <% if (!user) { %>
+        <div class="box dark">
+          <h3>Are you a tradie?</h3>
+          <p class="small">Quote on this job and others like it. No lead fees.</p>
+          <a class="btn block" style="background:var(--paper);color:var(--ink)" href="/signup?as=tradie">Join free</a>
+        </div>
+      <% } %>
+
+      <% if (isOwner && ['open', 'awarded'].includes(job.status) && (!payment || payment.status === 'pending')) { %>
+        <form method="post" action="/jobs/<%= job.id %>/cancel" style="margin-top:16px" data-confirm="Close this job? Tradies will no longer see it.">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="linkish danger small">Close this job</button>
+        </form>
+      <% } %>
+    </aside>
+  </div>
+</div>
+<%- include('../partials/foot') %>

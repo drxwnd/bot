@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title ? `${title} | ${siteName}` : `${siteName} | Local tradies for Perth repair, maintenance and building jobs` %></title>
+  <meta name="description" content="<%= typeof description !== 'undefined' ? description : 'Post a repair, maintenance or building job in Perth and get quotes from checked local tradies. Your payment is held until the job is done.' %>">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="/"><%- include('mark') %>ezbuild<small>WA</small></a>
+
+    <nav class="nav" aria-label="Main">
+      <a href="/jobs" class="<%= path === '/jobs' ? 'on' : '' %>">Browse jobs</a>
+      <a href="/how-it-works" class="<%= path === '/how-it-works' ? 'on' : '' %>">How it works</a>
+      <a href="/for-tradies" class="<%= path === '/for-tradies' ? 'on' : '' %>">For tradies</a>
+      <div class="right">
+        <% if (user) { %>
+          <% if (user.role === 'admin') { %><a href="/admin">Admin</a><% } %>
+          <a href="/dashboard" class="<%= path.startsWith('/dashboard') ? 'on' : '' %>"><%= user.role === 'tradie' ? 'Dashboard' : 'My jobs' %></a>
+          <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish" style="text-decoration:none;color:var(--ink-2)">Log out</button></form>
+        <% } else { %>
+          <a href="/login">Log in</a>
+        <% } %>
+        <% if (!user || user.role !== 'tradie') { %>
+          <a class="btn small" href="/jobs/new">Post a job</a>
+        <% } %>
+      </div>
+    </nav>
+
+    <details class="menu">
+      <summary>Menu</summary>
+      <div class="panel">
+        <% if (!user || user.role !== 'tradie') { %><a href="/jobs/new"><strong>Post a job</strong></a><% } %>
+        <a href="/jobs">Browse jobs</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/for-tradies">For tradies</a>
+        <% if (user) { %>
+          <% if (user.role === 'admin') { %><a href="/admin">Admin</a><% } %>
+          <a href="/dashboard"><%= user.role === 'tradie' ? 'Dashboard' : 'My jobs' %></a>
+          <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish" style="text-decoration:none">Log out</button></form>
+        <% } else { %>
+          <a href="/login">Log in</a>
+        <% } %>
+      </div>
+    </details>
+  </div>
+</header>
+<% if (flash) { %>
+<div class="flash-bar"><div class="wrap"><div class="notice <%= flash.type %>" role="status"><%= flash.text %></div></div></div>
+<% } %>
+<main id="main">

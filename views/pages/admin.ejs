@@ -1,0 +1,89 @@
+<%- include('../partials/head') %>
+<div class="wrap page">
+  <span class="eyebrow">Admin</span>
+  <h1>Overview</h1>
+
+  <div class="stats" style="margin-top:24px">
+    <div><span>Fees earned</span><b><%= money(totals.fees_earned) %></b></div>
+    <div><span>Currently held</span><b><%= money(totals.held) %></b></div>
+    <div><span>Job value paid out</span><b><%= money(totals.volume) %></b></div>
+    <div><span>Tradies waiting</span><b><%= tradies.filter(t => t.status === 'pending').length %></b></div>
+  </div>
+
+  <h2 id="tradies" style="font-size:1.4rem">Tradies</h2>
+  <div class="table-wrap" style="margin-bottom:48px">
+    <table>
+      <thead><tr><th>Business</th><th>ABN</th><th>Licence / insurance</th><th>Contact</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% if (!tradies.length) { %><tr><td colspan="6" class="muted">No tradies yet.</td></tr><% } %>
+        <% tradies.forEach(t => { %>
+          <tr>
+            <td><strong><%= t.business_name %></strong><br><span class="small muted"><%= t.trades.split(',').map(s => tradeName[s]).join(', ') %></span></td>
+            <td class="mono"><a href="https://abr.business.gov.au/ABN/View?abn=<%= t.abn %>" target="_blank" rel="noopener"><%= formatAbn(t.abn) %></a></td>
+            <td class="small"><%= t.licence_no || 'No licence given' %><br><%= t.insurer %>, exp. <%= t.insurance_expiry %></td>
+            <td class="small"><%= t.name %><br><a href="mailto:<%= t.email %>"><%= t.email %></a><br><%= t.phone %></td>
+            <td><span class="tag <%= t.status %>"><%= t.status %></span><% if (t.payouts_enabled) { %><br><span class="small muted">payouts on</span><% } %></td>
+            <td>
+              <div class="actions">
+                <% if (t.status !== 'approved') { %>
+                  <form method="post" action="/admin/tradies/<%= t.user_id %>/approve"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn small">Approve</button></form>
+                <% } %>
+                <% if (t.status !== 'rejected') { %>
+                  <form method="post" action="/admin/tradies/<%= t.user_id %>/reject" data-confirm="Reject <%= t.business_name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ghost small">Reject</button></form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="payments" style="font-size:1.4rem">Payments</h2>
+  <div class="table-wrap" style="margin-bottom:48px">
+    <table>
+      <thead><tr><th>Job</th><th>Tradie</th><th class="num">Amount</th><th class="num">Fee</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% if (!payments.length) { %><tr><td colspan="6" class="muted">No payments yet.</td></tr><% } %>
+        <% payments.forEach(p => { %>
+          <tr>
+            <td><a href="/jobs/<%= p.job_id %>"><%= p.title %></a><br><span class="small muted">paid <%= p.paid_at ? shortDate(p.paid_at) : '' %></span></td>
+            <td><%= p.business_name %></td>
+            <td class="num"><%= money(p.amount_cents) %></td>
+            <td class="num"><%= money(p.fee_cents) %></td>
+            <td><span class="tag <%= p.status %>"><%= p.status %></span></td>
+            <td>
+              <% if (p.status === 'held') { %>
+                <div class="actions">
+                  <form method="post" action="/admin/payments/<%= p.id %>/release" data-confirm="Release <%= money(p.amount_cents - p.fee_cents) %> to <%= p.business_name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn small">Release</button></form>
+                  <form method="post" action="/admin/payments/<%= p.id %>/refund" data-confirm="Refund <%= money(p.amount_cents) %> to the customer and cancel the job?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ghost small">Refund</button></form>
+                </div>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 style="font-size:1.4rem">Recent jobs</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Job</th><th>Customer</th><th>Suburb</th><th class="num">Quotes</th><th>Status</th><th>Posted</th></tr></thead>
+      <tbody>
+        <% if (!jobs.length) { %><tr><td colspan="6" class="muted">No jobs yet.</td></tr><% } %>
+        <% jobs.forEach(j => { %>
+          <tr>
+            <td><span class="mono muted">#<%= String(j.id).padStart(4, '0') %></span>&nbsp; <a href="/jobs/<%= j.id %>"><%= j.title %></a></td>
+            <td><%= j.customer_name %></td>
+            <td><%= j.suburb %></td>
+            <td class="num"><%= j.quote_count %></td>
+            <td><span class="tag <%= j.status %>"><%= STATUS_LABEL[j.status] %></span></td>
+            <td class="muted"><%= ago(j.created_at) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<%- include('../partials/foot') %>

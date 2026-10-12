@@ -1,0 +1,90 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow"><%= profile ? profile.business_name : user.name %></span>
+    <h1>Dashboard</h1>
+  </div>
+
+  <div class="page" style="padding-top:0">
+    <% if (!profile) { %>
+      <div class="notice info">Add your business details so we can check you over. You can't quote until that's done. <a href="/dashboard/profile">Add details</a></div>
+    <% } else if (profile.status === 'pending') { %>
+      <div class="notice info">We're checking your ABN, licence and insurance. This usually takes one business day. You can <a href="/jobs">browse jobs</a> in the meantime.</div>
+    <% } else if (profile.status === 'rejected') { %>
+      <div class="notice error">We couldn't approve your account with the details given. Email <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a> and we'll explain what's missing.</div>
+    <% } else if (!profile.payouts_enabled) { %>
+      <div class="notice info">You're approved. Set up payouts so you can get paid when customers sign off jobs. <a href="/dashboard/payouts">Set up payouts</a></div>
+    <% } %>
+
+    <div class="stats">
+      <div><span>Account</span><b style="font-size:1rem;margin-top:8px"><span class="tag <%= profile ? profile.status : 'pending' %>"><%= profile ? profile.status : 'incomplete' %></span></b></div>
+      <div><span>Quotes sent</span><b><%= quotes.length %></b></div>
+      <div><span>Jobs won</span><b><%= quotes.filter(q => q.status === 'accepted').length %></b></div>
+      <div><span>Paid out</span><b><%= money(paidOut) %></b></div>
+    </div>
+
+    <div class="with-side">
+      <div>
+        <% if (profile && profile.status === 'approved') { %>
+          <div class="section-head" style="margin-bottom:16px"><h2 style="font-size:1.4rem">New jobs for you</h2><a href="/jobs">All jobs &rarr;</a></div>
+          <% if (matches.length) { %>
+            <div class="job-rows" style="margin-bottom:48px">
+              <% matches.forEach(job => { job.quote_count = job.quote_count || 0; %>
+                <a class="job-row" href="/jobs/<%= job.id %>">
+                  <span class="n">#<%= String(job.id).padStart(4, '0') %></span>
+                  <span class="t"><%= job.title %></span>
+                  <span class="r"><%= ago(job.created_at) %></span>
+                  <span class="m"><span><%= tradeName[job.trade] %></span><span><%= job.suburb %></span><span><%= budgetName[job.budget] %></span></span>
+                </a>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <div class="empty" style="margin-bottom:48px">No new jobs in your trades and areas right now. Check back soon.</div>
+          <% } %>
+        <% } %>
+
+        <h2 style="font-size:1.4rem">Your quotes</h2>
+        <% if (quotes.length) { %>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Job</th><th class="num">Quote</th><th>Status</th></tr></thead>
+              <tbody>
+                <% quotes.forEach(q => {
+                  let label = q.status, cls = q.status;
+                  if (q.status === 'accepted') {
+                    label = q.job_status === 'completed' ? 'paid out' : q.payment_status === 'held' ? 'paid, start work' : 'won, awaiting payment';
+                    cls = q.job_status === 'completed' || q.payment_status === 'held' ? 'released' : 'pending';
+                  } else if (q.status === 'pending' && q.job_status !== 'open') { label = 'job closed'; cls = 'cancelled'; }
+                %>
+                  <tr>
+                    <td><a href="/jobs/<%= q.job_id %>"><%= q.title %></a><br><span class="small muted"><%= q.suburb %> &middot; sent <%= ago(q.created_at) %></span></td>
+                    <td class="num"><%= money(q.amount_cents) %></td>
+                    <td><span class="tag <%= cls %>"><%= label %></span></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="empty">You haven't sent any quotes yet.</div>
+        <% } %>
+      </div>
+
+      <aside>
+        <div class="box">
+          <h3>Your account</h3>
+          <ul class="plain-list small" style="margin-top:8px">
+            <li><a href="/dashboard/profile">Business details</a></li>
+            <li><a href="/dashboard/payouts">Payouts</a> <%= profile && profile.payouts_enabled ? '· set up' : '· not set up' %></li>
+            <% if (profile && profile.status === 'approved') { %><li><a href="/tradies/<%= user.id %>">Your public profile</a></li><% } %>
+          </ul>
+        </div>
+        <div class="box">
+          <h3>How you get paid</h3>
+          <p class="small muted" style="margin:0">Customers pay when they accept your quote, and we hold it. Once they sign the job off, we send you the full amount minus <%= feePercent %>%. It usually lands in your bank within 2 business days.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

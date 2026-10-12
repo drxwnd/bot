@@ -1,0 +1,53 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <div class="profile-head">
+      <div class="initials"><%= tradie.business_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') %></div>
+      <div>
+        <h1 style="margin-bottom:6px"><%= tradie.business_name %></h1>
+        <div class="muted">
+          <% if (avg) { %><span style="color:var(--accent)">★</span> <%= avg.toFixed(1) %> from <%= reviews.length %> review<%= reviews.length === 1 ? '' : 's' %> &middot; <% } %>
+          <%= completed %> job<%= completed === 1 ? '' : 's' %> done through ezbuild
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="with-side page" style="padding-top:0">
+    <div>
+      <% if (tradie.bio) { %>
+        <h2 style="font-size:1.4rem">About</h2>
+        <p class="prose"><%= tradie.bio %></p>
+        <hr>
+      <% } %>
+
+      <h2 style="font-size:1.4rem">Reviews</h2>
+      <% if (!reviews.length) { %>
+        <div class="empty">No reviews yet. Reviews can only be left by customers who've paid for a job through ezbuild.</div>
+      <% } %>
+      <% reviews.forEach(r => { %>
+        <div class="review">
+          <div class="stars-static"><%= '★'.repeat(r.rating) %><span style="color:var(--rule-2)"><%= '★'.repeat(5 - r.rating) %></span></div>
+          <strong><%= r.title %></strong>
+          <div class="small muted"><%= r.customer_name.split(' ')[0] %>, <%= r.suburb %> &middot; <%= shortDate(r.created_at) %></div>
+          <% if (r.comment) { %><p class="prose" style="margin:10px 0 0"><%= r.comment %></p><% } %>
+        </div>
+      <% }) %>
+    </div>
+
+    <aside>
+      <div class="box">
+        <dl class="kv">
+          <dt>Trades</dt><dd><%= tradie.trades.split(',').map(s => tradeName[s]).join(', ') %></dd>
+          <dt>Areas</dt><dd><%= tradie.regions.split(',').map(s => regionName[s]).join(', ') %></dd>
+          <% if (tradie.years_trading) { %><dt>Experience</dt><dd><%= tradie.years_trading %> years</dd><% } %>
+          <dt>ABN</dt><dd>Checked</dd>
+          <dt>Insurance</dt><dd>Checked</dd>
+          <% if (tradie.licence_no) { %><dt>Licence</dt><dd class="mono"><%= tradie.licence_no %></dd><% } %>
+          <dt>Joined</dt><dd><%= shortDate(tradie.created_at) %></dd>
+        </dl>
+      </div>
+    </aside>
+  </div>
+</div>
+<%- include('../partials/foot') %>

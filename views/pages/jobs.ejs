@@ -1,0 +1,41 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow"><%= jobs.length %> open job<%= jobs.length === 1 ? '' : 's' %></span>
+    <h1>Jobs around Perth</h1>
+    <p>Jobs posted by Perth homeowners, landlords and businesses. <% if (!user || user.role !== 'tradie') { %>Tradies need a checked account to quote. <a href="/for-tradies">How it works</a>.<% } %></p>
+  </div>
+
+  <form class="filters" method="get" action="/jobs">
+    <div class="field">
+      <label for="trade">Trade</label>
+      <select id="trade" name="trade">
+        <option value="">All trades</option>
+        <% TRADES.forEach(t => { %><option value="<%= t.slug %>" <%= trade === t.slug ? 'selected' : '' %>><%= t.name %></option><% }) %>
+      </select>
+    </div>
+    <div class="field">
+      <label for="region">Area</label>
+      <select id="region" name="region">
+        <option value="">All of Perth</option>
+        <% REGIONS.forEach(r => { %><option value="<%= r.slug %>" <%= region === r.slug ? 'selected' : '' %>><%= r.name %></option><% }) %>
+      </select>
+    </div>
+    <button class="btn ghost">Filter</button>
+    <% if (trade || region) { %><a href="/jobs" class="small" style="padding-bottom:12px">Clear</a><% } %>
+  </form>
+
+  <div class="page" style="padding-top:0">
+    <% if (jobs.length) { %>
+      <div class="job-rows">
+        <% jobs.forEach(job => { %><%- include('../partials/job-row', { job, showDesc: true }) %><% }) %>
+      </div>
+    <% } else { %>
+      <div class="empty">
+        <strong>No open jobs<%= trade || region ? ' matching that' : ' right now' %>.</strong>
+        <%= trade || region ? 'Try widening the filters.' : 'New jobs show up here as soon as they are posted.' %>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('../partials/foot') %>
