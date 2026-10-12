@@ -62,11 +62,22 @@ router.get('/dashboard', requireLogin, (req, res) => {
 
 // ---- Tradie business profile ----
 
+// A new tradie's first visit uses what they told the get-started quiz.
+function prefillFromQuiz(intent, base) {
+  const fromQuiz = intent && intent.path === 'tradie' ? intent : {};
+  return {
+    ...base,
+    sectors: fromQuiz.sectors && fromQuiz.sectors.length ? fromQuiz.sectors : ['housing'],
+    trades: fromQuiz.trades || [],
+    regions: fromQuiz.regions || [],
+  };
+}
+
 router.get('/dashboard/profile', requireRole('tradie'), (req, res) => {
   const p = req.user.profile;
   const values = p
     ? { ...p, sectors: p.sectors.split(','), trades: p.trades.split(','), regions: p.regions.split(','), name: req.user.name, phone: req.user.phone }
-    : { sectors: ['housing'], trades: [], regions: [], name: req.user.name, phone: req.user.phone };
+    : prefillFromQuiz(req.session.intent, { name: req.user.name, phone: req.user.phone });
   res.render('pages/profile-edit', { title: 'Business details', values });
 });
 
@@ -100,6 +111,7 @@ router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
 
   if (error) return res.status(400).render('pages/profile-edit', { title: 'Business details', values, error });
 
+  req.session.intent = null;
   db.transaction(() => {
     q.updateUser.run(values.name, values.phone || null, req.user.id);
     q.upsertProfile.run({

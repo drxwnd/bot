@@ -119,6 +119,8 @@ router.get('/jobs', (req, res) => {
 
 router.get('/jobs/new', (req, res) => {
   if (!req.user) {
+    // New visitors go through the quick get-started questions first, unless they've already answered them.
+    if (!req.query.trade) return res.redirect('/start?path=need');
     flash(req, 'info', 'Create a free account first so tradies can send you quotes. It takes 30 seconds.');
     return res.redirect('/signup?next=' + encodeURIComponent(req.originalUrl));
   }
@@ -129,8 +131,10 @@ router.get('/jobs/new', (req, res) => {
   res.render('pages/job-new', {
     title: 'Post a job',
     values: {
-      trade: req.query.trade || '',
+      trade: C.tradeName[req.query.trade] ? req.query.trade : '',
       sector: C.sectorName[req.query.sector] ? req.query.sector : 'housing',
+      timing: C.timingName[req.query.timing] ? req.query.timing : '',
+      region: C.regionName[req.query.region] ? req.query.region : '',
     },
   });
 });

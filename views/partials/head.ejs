@@ -58,7 +58,7 @@
           <a href="/login">Log in</a>
         <% } %>
         <% if (!user || user.role !== 'tradie') { %>
-          <a class="btn small" href="/jobs/new">Post a job</a>
+          <a class="btn small" href="<%= user ? '/jobs/new' : '/start' %>"><%= user ? 'Post a job' : 'Get started' %></a>
         <% } %>
       </div>
     </nav>
@@ -66,7 +66,7 @@
     <details class="menu">
       <summary>Menu</summary>
       <div class="panel">
-        <% if (!user || user.role !== 'tradie') { %><a href="/jobs/new"><strong>Post a job</strong></a><% } %>
+        <% if (!user || user.role !== 'tradie') { %><a href="<%= user ? '/jobs/new' : '/start' %>"><strong><%= user ? 'Post a job' : 'Get started' %></strong></a><% } %>
         <% SECTORS.forEach(s => { %><a href="<%= s.path %>"><%= s.name %></a><% }) %>
         <a href="/jobs">Browse jobs</a>
         <a href="/how-it-works">How it works</a>

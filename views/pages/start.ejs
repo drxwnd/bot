@@ -1,0 +1,175 @@
+<%- include('../partials/head') %>
+<%
+  // Hidden fields carrying earlier answers through the multi-select (checkbox) steps.
+  const carry = (skip) => Object.entries(state)
+    .filter(([k, v]) => k !== skip && (Array.isArray(v) ? v.length : v))
+    .map(([k, v]) => `<input type="hidden" name="${k}" value="${Array.isArray(v) ? v.join(',') : v}">`)
+    .join('');
+  const tradeLabel = (slug) => slug === 'other' ? 'Something else' : tradeName[slug];
+  const regionShort = (slug) => regionName[slug].replace(/\s*\(.*\)$/, '');
+%>
+<div class="quiz">
+  <div class="quiz-top">
+    <% if (back) { %><a href="<%= back %>" class="quiz-back">Back</a><% } else { %><span></span><% } %>
+    <span class="quiz-count"><%= step === 'result' ? 'Done' : `${progress.at} of ${progress.total}` %></span>
+  </div>
+  <div class="quiz-bar"><span style="width:<%= Math.round((progress.at / progress.total) * 100) %>%"></span></div>
+
+  <% if (step === 'path') { %>
+    <h1>What brings you here?</h1>
+    <div class="opts">
+      <a class="opt" href="<%= link({ path: 'need' }) %>"><strong>I need work done</strong><span>Get quotes from checked tradies</span></a>
+      <a class="opt" href="<%= link({ path: 'tradie' }) %>"><strong>I'm a tradie</strong><span>Find jobs, no lead fees</span></a>
+      <a class="opt" href="/start?path=look"><strong>Just having a look</strong><span>See how it works first</span></a>
+    </div>
+
+  <% } else if (step === 'who') { %>
+    <h1>Who's the work for?</h1>
+    <div class="opts">
+      <% WHO.forEach(w => { %>
+        <a class="opt" href="<%= link({ who: w.slug }) %>"><strong><%= w.name %></strong><span><%= w.hint %></span></a>
+      <% }) %>
+    </div>
+
+  <% } else if (step === 'trade') { %>
+    <h1>What needs doing?</h1>
+    <p class="quiz-sub">Pick the closest match. You'll describe it properly in the next part.</p>
+    <div class="opts grid">
+      <% popularTrades.forEach(t => { %><a class="opt" href="<%= link({ trade: t.slug }) %>"><strong><%= t.name %></strong></a><% }) %>
+    </div>
+    <details class="more">
+      <summary>More trades</summary>
+      <div class="opts grid">
+        <% otherTrades.forEach(t => { %><a class="opt" href="<%= link({ trade: t.slug }) %>"><strong><%= t.name %></strong></a><% }) %>
+      </div>
+    </details>
+    <div class="opts" style="margin-top:12px">
+      <a class="opt" href="<%= link({ trade: 'other' }) %>"><strong>Not sure</strong><span>Describe the problem and the right tradies will see it</span></a>
+    </div>
+
+  <% } else if (step === 'timing') { %>
+    <h1>How soon do you need it?</h1>
+    <div class="opts">
+      <% TIMINGS.forEach(t => { %>
+        <a class="opt" href="<%= link({ timing: t.slug }) %>"><strong><%= t.name %></strong><% if (TIMING_HINTS[t.slug]) { %><span><%= TIMING_HINTS[t.slug] %></span><% } %></a>
+      <% }) %>
+    </div>
+
+  <% } else if (step === 'region') { %>
+    <h1>Where's the job?</h1>
+    <p class="quiz-sub">Roughly is fine. You'll add the exact address later, and only the suburb is ever shown publicly.</p>
+    <% groups.forEach(g => { %>
+      <h2 class="quiz-group"><%= g %></h2>
+      <div class="opts grid">
+        <% REGIONS.filter(r => r.group === g).forEach(r => { %><a class="opt" href="<%= link({ region: r.slug }) %>"><strong><%= regionShort(r.slug) %></strong></a><% }) %>
+      </div>
+    <% }) %>
+
+  <% } else if (step === 'trades') { %>
+    <h1>What's your trade?</h1>
+    <p class="quiz-sub">Pick all that apply.</p>
+    <form method="get" action="/start/pick">
+      <%- carry('trades') %>
+      <div class="opts grid">
+        <% TRADES.filter(t => t.slug !== 'other').forEach(t => { %>
+          <label class="opt check"><input type="checkbox" name="pick_trades" value="<%= t.slug %>"><strong><%= t.name %></strong></label>
+        <% }) %>
+      </div>
+      <button class="btn big block quiz-next">Continue</button>
+    </form>
+
+  <% } else if (step === 'sectors') { %>
+    <h1>What kind of work do you want?</h1>
+    <p class="quiz-sub">Pick all that apply. You'll only see jobs that match.</p>
+    <form method="get" action="/start/pick">
+      <%- carry('sectors') %>
+      <div class="opts">
+        <% SECTORS.forEach(s => { %>
+          <label class="opt check"><input type="checkbox" name="pick_sectors" value="<%= s.slug %>" <%= s.slug === 'housing' ? 'checked' : '' %>><strong><%= s.name %></strong><span><%= s.short %></span></label>
+        <% }) %>
+      </div>
+      <button class="btn big block quiz-next">Continue</button>
+    </form>
+
+  <% } else if (step === 'regions') { %>
+    <h1>Where will you travel for work?</h1>
+    <p class="quiz-sub">Pick all that apply.</p>
+    <form method="get" action="/start/pick">
+      <%- carry('regions') %>
+      <% (state.sectors.length === 1 && state.sectors[0] === 'mining' ? [...REGION_GROUPS].reverse() : REGION_GROUPS).forEach(g => { %>
+        <h2 class="quiz-group"><%= g %></h2>
+        <div class="opts grid">
+          <% REGIONS.filter(r => r.group === g).forEach(r => { %>
+            <label class="opt check"><input type="checkbox" name="pick_regions" value="<%= r.slug %>"><strong><%= regionShort(r.slug) %></strong></label>
+          <% }) %>
+        </div>
+      <% }) %>
+      <button class="btn big block quiz-next">See my matches</button>
+    </form>
+
+  <% } else if (state.path === 'need') { %>
+    <h1>You're all set</h1>
+    <div class="plan">
+      <div><span>Work for</span><strong><%= WHO_BY[state.who].name %></strong><a href="<%= link({ who: '', trade: '', timing: '', region: '' }) %>">Change</a></div>
+      <div><span>Job</span><strong><%= tradeLabel(state.trade) %></strong><a href="<%= link({ trade: '', timing: '', region: '' }) %>">Change</a></div>
+      <div><span>When</span><strong><%= timingName[state.timing] %></strong><a href="<%= link({ timing: '', region: '' }) %>">Change</a></div>
+      <div><span>Where</span><strong><%= regionShort(state.region) %></strong><a href="<%= link({ region: '' }) %>">Change</a></div>
+    </div>
+
+    <% if (matches !== null) { %>
+      <p class="match <%= matches ? '' : 'none' %>">
+        <% if (matches) { %>
+          <strong><%= matches %> checked tradie<%= matches === 1 ? '' : 's' %></strong> doing <%= tradeName[state.trade].toLowerCase() %> cover<%= matches === 1 ? 's' : '' %> <%= regionShort(state.region) %> and will see your job.
+        <% } else { %>
+          We're still signing up <%= info ? info.plural.toLowerCase() : 'tradies' %> in <%= regionShort(state.region) %>. Post anyway and we'll get it in front of the right people.
+        <% } %>
+      </p>
+    <% } %>
+
+    <ul class="next-list">
+      <li><strong>Next:</strong> describe the job and add a couple of photos. About 2 minutes.</li>
+      <% if (state.who === 'landlord') { %><li>Post a separate job for each property so quotes and payments stay organised.</li><% } %>
+      <% if (state.who === 'hotel') { %><li>There's a box for access and timing: checkout times, rooms you can block out, quiet hours.</li><% } %>
+      <% if (state.who === 'mining') { %><li>You'll list site requirements: inductions, tickets, medicals, and whether travel and accommodation are covered.</li><% } %>
+      <% if (info) { %><li><%= info.tip %></li><% } %>
+      <li>Quotes are free and you don't have to accept any. When you do, you pay and we hold the money until the job's done.</li>
+    </ul>
+    <% if (info) { %><p class="small muted"><%= info.licence %></p><% } %>
+
+    <% if (user && user.role !== 'tradie') { %>
+      <a class="btn accent big block" href="<%= jobUrl %>">Describe the job</a>
+    <% } else { %>
+      <a class="btn accent big block" href="/signup?next=<%= encodeURIComponent(jobUrl) %>">Create a free account and continue</a>
+      <p class="small muted" style="text-align:center;margin-top:12px">Already have an account? <a href="/login?next=<%= encodeURIComponent(jobUrl) %>">Log in</a></p>
+    <% } %>
+
+  <% } else { %>
+    <h1><%= jobs.length ? `${jobs.length} open job${jobs.length === 1 ? '' : 's'} match you` : 'No matching jobs right this minute' %></h1>
+    <p class="quiz-sub">
+      <%= state.trades.map(t => tradeName[t]).join(', ') %> · <%= state.sectors.map(s => sectorName[s]).join(', ') %> · <%= state.regions.length %> area<%= state.regions.length === 1 ? '' : 's' %>
+      · <a href="<%= link({ trades: [], sectors: [], regions: [] }) %>">Change</a>
+    </p>
+
+    <% if (jobs.length) { %>
+      <div class="job-rows" style="margin-bottom:28px">
+        <% jobs.slice(0, 5).forEach(job => { %><%- include('../partials/job-row', { job }) %><% }) %>
+      </div>
+    <% } else { %>
+      <p class="match none">New jobs come in all the time. Sign up now and they'll show on your dashboard as soon as they're posted.</p>
+    <% } %>
+
+    <ul class="next-list">
+      <li><strong>Free to join and quote.</strong> No lead fees. We take <%= feePercent %>% only when you win a job and the customer releases payment.</li>
+      <li><strong>Paid before you start.</strong> The customer pays when they accept your quote and we hold it until the job's signed off.</li>
+      <li><strong>Have these ready:</strong> ABN, licence number if your trade needs one, and your public liability insurer and expiry date.</li>
+    </ul>
+
+    <% if (user && user.role === 'tradie') { %>
+      <a class="btn accent big block" href="/dashboard/profile">Update your business details</a>
+    <% } else { %>
+      <a class="btn accent big block" href="/signup?as=tradie">Create your tradie account</a>
+      <p class="small muted" style="text-align:center;margin-top:12px">We've saved your answers, so your business details will be filled in.</p>
+    <% } %>
+  <% } %>
+</div>
+<%- include('../partials/foot') %>

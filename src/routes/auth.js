@@ -8,7 +8,7 @@ const router = express.Router();
 
 const findByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
 const insertUser = db.prepare(
-  'INSERT INTO users (email, password_hash, name, phone, role, company) VALUES (?, ?, ?, ?, ?, ?)',
+  'INSERT INTO users (email, password_hash, name, phone, role, company, customer_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
 );
 
 // Small in-memory throttle on login attempts per IP + email.
@@ -97,7 +97,9 @@ router.post('/signup', async (req, res) => {
   const role = config.adminEmail && values.email === config.adminEmail ? 'admin' : as;
   const hash = await bcrypt.hash(password, 11);
   const company = role === 'tradie' ? null : values.company || null;
-  const info = insertUser.run(values.email, hash, values.name, values.phone || null, role, company);
+  const intent = req.session.intent || {};
+  const customerType = role === 'customer' && intent.path === 'need' ? intent.who : null;
+  const info = insertUser.run(values.email, hash, values.name, values.phone || null, role, company, customerType);
   req.session.uid = Number(info.lastInsertRowid);
 
   if (role === 'tradie') {

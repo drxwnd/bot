@@ -75,6 +75,7 @@ app.use('/uploads', express.static(config.uploadDir, { maxAge: '30d' }));
 app.use((req, res, next) => (req.is('multipart/form-data') ? next() : verifyCsrf(req, res, next)));
 
 app.use(require('./src/routes/seo'));
+app.use(require('./src/routes/start'));
 app.use(require('./src/routes/public'));
 app.use(require('./src/routes/auth'));
 app.use(require('./src/routes/jobs'));

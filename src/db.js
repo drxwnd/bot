@@ -110,6 +110,8 @@ function addColumn(table, column, definition) {
 }
 
 addColumn('users', 'company', 'TEXT');
+// Who a customer is (home, landlord, hotel, mining), from the get-started quiz.
+addColumn('users', 'customer_type', 'TEXT');
 addColumn('jobs', 'sector', "TEXT NOT NULL DEFAULT 'housing'");
 addColumn('jobs', 'requirements', 'TEXT');
 addColumn('tradie_profiles', 'sectors', "TEXT NOT NULL DEFAULT 'housing'");
