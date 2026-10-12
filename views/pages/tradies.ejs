@@ -30,22 +30,12 @@
 
   <h2>Questions</h2>
   <div class="faq" style="margin-top:16px">
-    <details>
-      <summary>What if the customer won't sign off a finished job?</summary>
-      <p>Email us with the job number. We'll talk to both of you, look at photos of the finished work, and release the payment if it was done as quoted.</p>
-    </details>
-    <details>
-      <summary>What if the job turns out bigger than the quote?</summary>
-      <p>Talk to the customer first. Extra work can go up as a separate job so it's paid and held the same way.</p>
-    </details>
-    <details>
-      <summary>Is the <%= feePercent %>% plus GST?</summary>
-      <p>No. It's <%= feePercent %>% of the quote, all in, taken out before the payout.</p>
-    </details>
-    <details>
-      <summary>Can I deal with the customer directly next time?</summary>
-      <p>For 12 months after we introduce you, please keep jobs with that customer on the site. That's what lets us skip charging for leads.</p>
-    </details>
+    <% faqs.forEach(([question, answer]) => { %>
+      <details>
+        <summary><%= question %></summary>
+        <p><%= answer %></p>
+      </details>
+    <% }) %>
   </div>
 
   <p style="margin-top:40px"><a class="btn accent big" href="/signup?as=tradie">Join free</a></p>

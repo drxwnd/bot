@@ -1,0 +1,12 @@
+<%- include('../partials/head') %>
+<div class="wrap page">
+  <h1>Tradies across Perth and regional WA</h1>
+  <p class="muted" style="max-width:620px;font-size:1.08rem">Tradies choose the areas they'll travel to. Pick yours to see who covers it.</p>
+  <% REGION_GROUPS.forEach(g => { %>
+    <h2 style="font-size:1.35rem;margin-top:40px"><%= g %></h2>
+    <ul class="trade-list">
+      <% REGIONS.filter(r => r.group === g).forEach(r => { %><li><a href="/areas/<%= r.slug %>"><%= r.name %></a></li><% }) %>
+    </ul>
+  <% }) %>
+</div>
+<%- include('../partials/foot') %>

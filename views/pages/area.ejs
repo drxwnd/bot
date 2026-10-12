@@ -1,0 +1,45 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <h1><%= title %></h1>
+    <p>Checked tradies covering <%= area.places.join(', ') %>. Post your job free, compare quotes, and pay only when the work is done.</p>
+    <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new">Post a job</a></p>
+  </div>
+
+  <div class="split page" style="padding-top:8px">
+    <div class="doc">
+      <h2>Working in <%= label %></h2>
+      <p><%= area.note %></p>
+      <p>When you post, say the suburb or town and anything about access. For regional jobs, mention whether accommodation or travel is covered. Tradies factor it into the price.</p>
+    </div>
+    <div class="doc">
+      <h2>Trades in <%= label %></h2>
+      <ul class="link-cloud">
+        <% trades.forEach(t => { %><li><a href="/trades/<%= t.slug %>/<%= region.slug %>"><%= TRADE_INFO[t.slug].plural %></a></li><% }) %>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<section class="section">
+  <div class="wrap">
+    <h2>Tradies covering <%= label %></h2>
+    <% if (tradies.length) { %>
+      <%- include('../partials/tradie-cards', { tradies }) %>
+    <% } else { %>
+      <div class="empty">We're still signing up tradies in <%= label %>. Post your job and we'll get it in front of the right people. <a href="/signup?as=tradie">Tradie in <%= label %>? Join free.</a></div>
+    <% } %>
+  </div>
+</section>
+
+<% if (jobs.length) { %>
+<section class="section">
+  <div class="wrap">
+    <h2>Open jobs in <%= label %></h2>
+    <div class="job-rows">
+      <% jobs.forEach(job => { %><%- include('../partials/job-row', { job }) %><% }) %>
+    </div>
+  </div>
+</section>
+<% } %>
+<%- include('../partials/foot') %>

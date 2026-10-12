@@ -5,7 +5,7 @@ const config = require('./config');
 
 fs.mkdirSync(config.dataDir, { recursive: true });
 
-const db = new Database(process.env.DB_FILE || path.join(config.dataDir, 'ezbuild.db'));
+const db = new Database(process.env.DB_FILE || path.join(config.dataDir, 'tradebench.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 

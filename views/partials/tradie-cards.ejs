@@ -1,0 +1,9 @@
+<div class="tradie-list">
+  <% tradies.forEach(t => { %>
+    <a class="tradie-card" href="/tradies/<%= t.id %>">
+      <strong><%= t.business_name %></strong>
+      <span><%= t.trades.split(',').map(s => tradeName[s]).filter(Boolean).slice(0, 3).join(', ') %></span>
+      <span class="muted"><% if (t.review_count) { %>★ <%= t.rating %> (<%= t.review_count %>)<% } else { %>New<% } %><% if (t.years_trading) { %> · <%= t.years_trading %> yrs<% } %></span>
+    </a>
+  <% }) %>
+</div>

@@ -1,6 +1,6 @@
-# ezbuild
+# Tradebench
 
-Marketplace for repair, maintenance and building jobs in Perth, WA.
+Marketplace for repair, maintenance and building jobs for homes, hotels and mine sites across WA.
 
 Customers post jobs for free and checked tradies send quotes. The customer pays the accepted quote by card and the money is held until the customer signs the job off. The tradie is then paid the quote minus a 4% platform fee.
 
@@ -40,6 +40,15 @@ Any host that runs Node 20+ with a persistent disk works (Render, Railway, Fly.i
 2. Point `DATA_DIR` and `UPLOAD_DIR` at the persistent disk.
 3. Run `npm install`, then `npm start`.
 4. Point your domain at the host.
+
+## SEO
+
+- Every page has its own title, description, canonical URL and social share tags (`views/partials/head.ejs`).
+- Landing pages for each trade (`/trades/plumbing`), each area (`/areas/pilbara`) and each trade in each area (`/trades/plumbing/pilbara`). Their copy lives in `src/seo-content.js`.
+- Trade + area pages are only indexed once they have an open job or a tradie covering them, so Google doesn't see hundreds of empty pages.
+- Structured data for Google: organisation, breadcrumbs, services, FAQs and tradie ratings.
+- `/sitemap.xml` updates itself as jobs and tradies are added. `/robots.txt` keeps private pages out.
+- After launch, add the site to [Google Search Console](https://search.google.com/search-console), put the verification code in `GOOGLE_SITE_VERIFICATION`, and submit the sitemap.
 
 ## Running the site
 

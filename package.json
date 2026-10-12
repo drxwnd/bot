@@ -1,5 +1,5 @@
 {
-  "name": "ezbuild-au",
+  "name": "tradebench",
   "version": "0.1.0",
   "private": true,
   "description": "Perth marketplace for repair, maintenance and building jobs.",
@@ -17,6 +17,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
+    "compression": "^1.8.2",
     "cookie-session": "^2.1.1",
     "dotenv": "^18.0.7",
     "ejs": "^7.0.1",

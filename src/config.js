@@ -5,7 +5,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 
 const config = {
-  siteName: process.env.SITE_NAME || 'ezbuild',
+  siteName: process.env.SITE_NAME || 'Tradebench',
   siteUrl: (process.env.SITE_URL || 'http://localhost:3000').replace(/\/$/, ''),
   port: Number(process.env.PORT) || 3000,
   isProd: process.env.NODE_ENV === 'production',
@@ -18,7 +18,7 @@ const config = {
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
 
   adminEmail: (process.env.ADMIN_EMAIL || '').toLowerCase(),
-  supportEmail: process.env.SUPPORT_EMAIL || 'hello@ezbuild.com.au',
+  supportEmail: process.env.SUPPORT_EMAIL || 'hello@tradebench.au',
 
   dataDir: process.env.DATA_DIR || path.join(root, 'data'),
   uploadDir: process.env.UPLOAD_DIR || path.join(root, 'uploads'),

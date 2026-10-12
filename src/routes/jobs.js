@@ -9,6 +9,7 @@ const config = require('../config');
 const C = require('../constants');
 const payments = require('../payments');
 const { parseDollars } = require('../helpers');
+const seo = require('../seo');
 const { flash, verifyCsrf, requireLogin, requireRole, requireApprovedTradie } = require('../middleware');
 
 const router = express.Router();
@@ -101,8 +102,11 @@ router.get('/jobs', (req, res) => {
       FROM jobs j WHERE ${where.join(' AND ')} ORDER BY j.created_at DESC LIMIT 100`)
     .all(params);
 
+  // Filtered views are near-duplicates of the main board, so keep them out of the index.
+  if (trade || region || sector) res.locals.robots = 'noindex, follow';
   res.render('pages/jobs', {
-    title: sector ? `${C.sectorName[sector]} jobs in WA` : 'Jobs around WA',
+    title: sector ? `${C.sectorName[sector]} jobs in WA` : 'Open trade jobs in Perth and WA',
+    description: 'Repair, maintenance and building jobs posted by homeowners, hotels and mining companies across WA. Free for tradies to quote, no lead fees.',
     jobs,
     trade,
     region,
@@ -206,8 +210,19 @@ router.get('/jobs/:id', loadJob, (req, res) => {
   let awardedTradie = null;
   if (accepted && isOwner) awardedTradie = quotes.find((x) => x.id === accepted.id) || null;
 
+  // Only open jobs are useful to searchers. Awarded, paid or closed ones drop out of the index.
+  if (job.status !== 'open') res.locals.robots = 'noindex, nofollow';
+  const crumbs = [
+    { name: 'Home', path: '/' },
+    { name: 'Jobs', path: '/jobs' },
+    { name: C.tradeName[job.trade], path: `/trades/${job.trade}` },
+    { name: `#${String(job.id).padStart(4, '0')}`, path: `/jobs/${job.id}` },
+  ];
   res.render('pages/job', {
-    title: job.title,
+    title: `${job.title}, ${job.suburb}`,
+    description: seo.truncate(`${C.tradeName[job.trade]} job in ${job.suburb} ${job.postcode}. ${job.description}`),
+    breadcrumbs: job.trade === 'other' ? null : crumbs,
+    jsonld: job.trade === 'other' ? [] : [seo.breadcrumbList(crumbs)],
     job,
     photos: q.photos.all(job.id),
     quotes,

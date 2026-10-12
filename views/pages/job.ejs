@@ -115,7 +115,7 @@
               <div>
                 <h3><a href="/tradies/<%= qt.tradie_id %>" style="text-decoration:none"><%= qt.business_name %></a></h3>
                 <div class="small muted">
-                  <% if (qt.review_count) { %><span style="color:var(--accent)">★</span> <%= qt.rating %> (<%= qt.review_count %>) &middot; <% } else { %>New on ezbuild &middot; <% } %>
+                  <% if (qt.review_count) { %><span style="color:var(--accent)">★</span> <%= qt.rating %> (<%= qt.review_count %>) &middot; <% } else { %>New on <%= siteName %> &middot; <% } %>
                   <% if (qt.years_trading) { %><%= qt.years_trading %> yrs trading &middot; <% } %>
                   Insured<% if (qt.licence_no) { %> &middot; Licensed<% } %>
                 </div>

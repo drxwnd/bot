@@ -3,7 +3,7 @@
   <div class="wrap">
     <div class="foot-grid">
       <div>
-        <a class="logo" href="/"><%- include('mark') %>ezbuild</a>
+        <a class="logo" href="/"><%- include('mark') %>tradebench</a>
         <p class="small muted" style="margin-top:14px;max-width:280px">Repair, maintenance and building work for homes, hotels and mine sites across WA. Started by a Perth family with a tiler in it.</p>
       </div>
       <div>
@@ -14,6 +14,14 @@
           <li><a href="/hotels">Hotels</a></li>
           <li><a href="/mining">Mining</a></li>
           <li><a href="/how-it-works">How it works</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Find a tradie</h4>
+        <ul>
+          <% ['plumbing', 'electrical', 'tiling', 'aircon', 'painting', 'roofing'].forEach(s => { %><li><a href="/trades/<%= s %>"><%= TRADE_INFO[s].plural %></a></li><% }) %>
+          <li><a href="/trades">All trades</a></li>
+          <li><a href="/areas">All areas</a></li>
         </ul>
       </div>
       <div>

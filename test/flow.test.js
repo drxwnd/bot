@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ezbuild-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tradebench-test-'));
 process.env.DATA_DIR = tmp;
 process.env.UPLOAD_DIR = path.join(tmp, 'uploads');
 process.env.STRIPE_SECRET_KEY = '';

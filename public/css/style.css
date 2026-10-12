@@ -1452,7 +1452,7 @@ td form {
 
 .foot-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
   gap: 32px;
 }
 
@@ -1649,4 +1649,71 @@ form:has(input[name='sector'][value='mining']:checked) .sector-extra-mining {
   .sector-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* Breadcrumbs */
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 20px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.crumbs a {
+  color: var(--muted);
+}
+
+.crumbs + .wrap .page-head,
+.crumbs + .wrap.page {
+  padding-top: 20px;
+}
+
+/* Link lists on landing pages */
+.link-cloud {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.link-cloud a[aria-current] {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.link-group {
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin: 24px 0 10px;
+}
+
+.tradie-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.tradie-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px;
+  background: var(--white);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.tradie-card strong {
+  font-size: 1rem;
+}
+
+.tradie-card:hover {
+  border-color: var(--ink);
+  color: inherit;
 }

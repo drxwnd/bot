@@ -87,8 +87,8 @@
   <div class="wrap">
     <h2>What do you need done?</h2>
     <ul class="trade-list">
-      <% TRADES.filter(t => t.slug !== 'other').forEach(t => { %>
-        <li><a href="/jobs/new?trade=<%= t.slug %>"><%= t.name %></a></li>
+      <% TRADES.filter(t => TRADE_INFO[t.slug]).forEach(t => { %>
+        <li><a href="/trades/<%= t.slug %>"><%= t.name %></a></li>
       <% }) %>
       <li><a href="/jobs/new?trade=other">Something else</a></li>
     </ul>

@@ -3,9 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= title ? `${title} | ${siteName}` : `${siteName} | Tradies for homes, hotels and mine sites in WA` %></title>
-  <meta name="description" content="<%= typeof description !== 'undefined' ? description : 'Post a repair, maintenance or building job for a home, hotel or mine site in WA and get quotes from checked tradies. Your payment is held until the job is done.' %>">
+<%
+  const fullTitle = title ? `${title} | ${siteName}` : `${siteName} | Tradies for homes, hotels and mine sites in WA`;
+  const metaDescription = typeof description !== 'undefined' && description ? description : 'Post a repair, maintenance or building job for a home, hotel or mine site in WA. Get quotes from checked tradies and pay only when the job is done.';
+%>
+  <title><%= fullTitle %></title>
+  <meta name="description" content="<%= metaDescription %>">
+  <meta name="robots" content="<%= robots %>">
+  <link rel="canonical" href="<%= canonical %>">
+  <meta name="theme-color" content="#1c1b18">
+  <% if (googleVerification) { %><meta name="google-site-verification" content="<%= googleVerification %>"><% } %>
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="<%= siteName %>">
+  <meta property="og:locale" content="en_AU">
+  <meta property="og:title" content="<%= title || fullTitle %>">
+  <meta property="og:description" content="<%= metaDescription %>">
+  <meta property="og:url" content="<%= canonical %>">
+  <meta property="og:image" content="<%= ogImage %>">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<%= title || fullTitle %>">
+  <meta name="twitter:description" content="<%= metaDescription %>">
+  <meta name="twitter:image" content="<%= ogImage %>">
+
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <% (jsonld || []).forEach(data => { %><script type="application/ld+json"><%- jsonForScript(data) %></script>
+  <% }) %>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -15,7 +43,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap">
-    <a class="logo" href="/"><%- include('mark') %>ezbuild</a>
+    <a class="logo" href="/"><%- include('mark') %>tradebench</a>
 
     <nav class="nav" aria-label="Main">
       <% SECTORS.forEach(s => { %><a href="<%= s.path %>" class="<%= path === s.path ? 'on' : '' %>"><%= s.name %></a><% }) %>
@@ -58,3 +86,8 @@
 <div class="flash-bar"><div class="wrap"><div class="notice <%= flash.type %>" role="status"><%= flash.text %></div></div></div>
 <% } %>
 <main id="main">
+<% if (breadcrumbs) { %>
+<nav class="crumbs wrap" aria-label="Breadcrumb">
+  <% breadcrumbs.forEach((c, i) => { %><% if (i < breadcrumbs.length - 1) { %><a href="<%= c.path %>"><%= c.name %></a><span aria-hidden="true">/</span><% } else { %><span aria-current="page"><%= c.name %></span><% } %><% }) %>
+</nav>
+<% } %>
