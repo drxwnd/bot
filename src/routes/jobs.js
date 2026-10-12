@@ -325,7 +325,7 @@ router.post('/jobs/:id/review', requireLogin, loadJob, ownsJob, (req, res) => {
   }
   const quote = q.quote.get(job.accepted_quote_id);
   q.insertReview.run(job.id, quote.tradie_id, job.customer_id, rating, String(req.body.comment || '').trim().slice(0, 2000) || null);
-  flash(req, 'success', 'Review posted. Cheers.');
+  flash(req, 'success', 'Thanks, your review is up.');
   res.redirect(`/jobs/${job.id}`);
 });
 

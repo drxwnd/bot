@@ -26,7 +26,7 @@
     <div class="with-side">
       <div>
         <% if (profile && profile.status === 'approved') { %>
-          <div class="section-head" style="margin-bottom:16px"><h2 style="font-size:1.4rem">New jobs for you</h2><a href="/jobs">All jobs &rarr;</a></div>
+          <div class="section-head" style="margin-bottom:16px"><h2 style="font-size:1.4rem">New jobs for you</h2><a href="/jobs">All jobs</a></div>
           <% if (matches.length) { %>
             <div class="job-rows" style="margin-bottom:48px">
               <% matches.forEach(job => { job.quote_count = job.quote_count || 0; %>

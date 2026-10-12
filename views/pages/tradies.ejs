@@ -2,81 +2,52 @@
 <section class="band" style="padding-top:72px">
   <div class="wrap split">
     <div>
-      <span class="eyebrow">For tradies</span>
-      <h1 style="color:var(--white)">Real jobs around Perth. No paying for leads.</h1>
-      <p style="font-size:1.1rem;max-width:480px">Quote on the work you want. If you win it, we take <%= feePercent %>% when the customer pays out. If you don't, you pay nothing.</p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:28px">
-        <a class="btn big" href="/signup?as=tradie">Join free</a>
-        <a class="btn ghost big" href="/jobs">Browse open jobs</a>
-      </div>
+      <h1 style="color:var(--white)">Find work around Perth without paying for leads</h1>
+      <p style="font-size:1.1rem;max-width:480px">Looking at jobs and quoting is free. If you win the job, we take <%= feePercent %>% when the customer releases payment.</p>
+      <p style="margin-top:28px"><a class="btn big" href="/signup?as=tradie">Join free</a></p>
     </div>
     <div>
-      <span class="eyebrow">On a $3,500 job</span>
       <div class="sum">
-        <div><span class="label-col">Your quote</span><span><%= money(350000) %></span></div>
+        <div><span class="label-col">Quote</span><span><%= money(350000) %></span></div>
         <div><span class="label-col">Paid for leads</span><span><%= money(0) %></span></div>
-        <div><span class="label-col">ezbuild fee (<%= feePercent %>%)</span><span>&minus;<%= money(feeFor(350000)) %></span></div>
-        <div><span>Paid to your bank</span><span><%= money(350000 - feeFor(350000)) %></span></div>
+        <div><span class="label-col">Our fee (<%= feePercent %>%)</span><span>&minus;<%= money(feeFor(350000)) %></span></div>
+        <div><span>You get</span><span><%= money(350000 - feeFor(350000)) %></span></div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section" style="border-top:0">
-  <div class="wrap">
-    <div class="split">
-      <div>
-        <h2>Why tradies use it</h2>
-      </div>
-      <ul class="plain-list">
-        <li><strong>No lead fees, ever</strong><span>You don't pay to see jobs or to quote. Only on work you've won and been paid for.</span></li>
-        <li><strong>The money's there before you start</strong><span>Customers pay when they accept your quote. You'll see it's held before you buy materials or book the day.</span></li>
-        <li><strong>No chasing invoices</strong><span>When the customer signs off, the payment goes straight to your bank. Usually within 2 business days.</span></li>
-        <li><strong>Only checked tradies</strong><span>Every tradie has a checked ABN and insurance, so you're not up against uninsured cash-in-hand operators undercutting everyone.</span></li>
-        <li><strong>Reviews that are real</strong><span>Only customers who've paid through us can leave a review. Your rating is earned, and it's yours.</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
+<div class="wrap narrow page doc">
+  <h2>How you get paid</h2>
+  <p>The customer pays when they accept your quote, before you start. You'll see it on the job page, so you know the money's there before you buy materials or book the day.</p>
+  <p>When they sign the job off, the payment goes to your bank through Stripe, usually within 2 business days. You don't have to chase an invoice.</p>
 
-<section class="section">
-  <div class="wrap">
-    <div class="section-head"><h2>Getting started</h2></div>
-    <ol class="steps">
-      <li><h3>Sign up</h3><p>Name, email and mobile. Takes a minute.</p></li>
-      <li><h3>Add your details</h3><p>ABN, trades, the areas you cover, licence if needed, and insurance.</p></li>
-      <li><h3>We check you</h3><p>Usually within one business day. We'll email when you're approved.</p></li>
-      <li><h3>Set up payouts</h3><p>Connect your bank through Stripe, then start quoting.</p></li>
-    </ol>
-  </div>
-</section>
+  <h2>Who you're up against</h2>
+  <p>Everyone quoting has a checked ABN and current insurance. Reviews only come from customers who've paid through us.</p>
 
-<section class="section">
-  <div class="wrap narrow">
-    <h2>Questions from tradies</h2>
-    <div class="faq" style="margin-top:20px">
-      <details>
-        <summary>When does the customer pay?</summary>
-        <p>When they accept your quote. It's held until they confirm the work is done. Hold off starting until the job page shows it's paid.</p>
-      </details>
-      <details>
-        <summary>What if the customer won't sign off a finished job?</summary>
-        <p>Email us with the job number. We'll talk to both of you, look at photos of the finished work, and release the payment if the job was done as quoted.</p>
-      </details>
-      <details>
-        <summary>What if the job turns out bigger than the quote?</summary>
-        <p>Talk to the customer first. Extra work can be posted as a separate job so it's paid and protected the same way.</p>
-      </details>
-      <details>
-        <summary>Is the <%= feePercent %>% plus GST?</summary>
-        <p>No. It's <%= feePercent %>% of the quote amount, all in, taken out before the payout.</p>
-      </details>
-      <details>
-        <summary>Can I take the customer off the platform for the next job?</summary>
-        <p>Please don't for jobs that came through us within the first 12 months. That's how we keep fees low and stop charging for leads. Using ezbuild also keeps your payment protected and builds your reviews.</p>
-      </details>
-    </div>
-    <p style="margin-top:40px"><a class="btn accent big" href="/signup?as=tradie">Join free</a></p>
+  <h2>Signing up</h2>
+  <p>It takes about 10 minutes. You'll need your ABN, your licence number if your trade needs one, and your public liability insurer and expiry date. We check you over, usually within a business day. Then connect your bank through Stripe and you can start quoting.</p>
+
+  <h2>Questions</h2>
+  <div class="faq" style="margin-top:16px">
+    <details>
+      <summary>What if the customer won't sign off a finished job?</summary>
+      <p>Email us with the job number. We'll talk to both of you, look at photos of the finished work, and release the payment if it was done as quoted.</p>
+    </details>
+    <details>
+      <summary>What if the job turns out bigger than the quote?</summary>
+      <p>Talk to the customer first. Extra work can go up as a separate job so it's paid and held the same way.</p>
+    </details>
+    <details>
+      <summary>Is the <%= feePercent %>% plus GST?</summary>
+      <p>No. It's <%= feePercent %>% of the quote, all in, taken out before the payout.</p>
+    </details>
+    <details>
+      <summary>Can I deal with the customer directly next time?</summary>
+      <p>For 12 months after we introduce you, please keep jobs with that customer on the site. That's what lets us skip charging for leads.</p>
+    </details>
   </div>
-</section>
+
+  <p style="margin-top:40px"><a class="btn accent big" href="/signup?as=tradie">Join free</a></p>
+</div>
 <%- include('../partials/foot') %>

@@ -3,97 +3,71 @@
 <section class="hero">
   <div class="wrap">
     <div>
-      <span class="eyebrow">Perth metro &middot; Repairs, maintenance &amp; building</span>
-      <h1>Post the job. Compare quotes. Pay when it's <em>done.</em></h1>
-      <p class="lede">Describe what needs doing and add a few photos. Local tradies send you a price. You pay through ezbuild, and the tradie only gets the money once you've signed the job off.</p>
+      <h1>Get quotes from local Perth tradies</h1>
+      <p class="lede">Post your repair, maintenance or building job for free. Checked tradies send you a price, and your payment is held until the work is finished.</p>
       <div class="ctas">
-        <a class="btn accent big" href="/jobs/new">Post a job, it's free</a>
-        <a class="btn ghost big" href="/for-tradies">I'm a tradie</a>
+        <a class="btn accent big" href="/jobs/new">Post a job</a>
+        <a class="link-plain" href="/for-tradies">I'm a tradie</a>
       </div>
-      <p class="fine">No call centre. Your phone number stays hidden until you pick a quote.</p>
     </div>
 
-    <div>
+    <figure class="preview">
       <div class="docket" aria-label="Example job">
-        <div class="docket-top"><span>Job 0001 &middot; Example</span><span>3 quotes</span></div>
         <div class="docket-body">
           <h3>Regrout shower and replace four cracked floor tiles</h3>
-          <div class="docket-meta"><span>Tiling</span><span>Bayswater 6053</span><span>Within two weeks</span></div>
+          <div class="docket-meta">Tiling, Bayswater 6053</div>
         </div>
         <div class="docket-quotes">
           <div class="dq">
-            <strong>Northside Tile &amp; Waterproofing</strong><span class="amt">$780</span>
-            <span class="sub">Starts 14 Nov &middot; regrout only, tiles extra</span>
+            <span>Northside Tile &amp; Waterproofing</span><span class="amt">$780</span>
           </div>
           <div class="dq picked">
-            <strong>J. Russo Tiling</strong><span class="amt">$845</span>
-            <span class="sub">Starts 11 Nov &middot; tiles supplied, 2-yr warranty</span>
+            <span>J. Russo Tiling</span><span class="amt">$845</span>
           </div>
           <div class="dq">
-            <strong>Coastal Bathroom Repairs</strong><span class="amt">$920</span>
-            <span class="sub">Starts 20 Nov &middot; includes resealing</span>
+            <span>Coastal Bathroom Repairs</span><span class="amt">$920</span>
           </div>
         </div>
-        <div class="docket-foot">$845.00 held by ezbuild until the customer signs off</div>
+        <div class="docket-foot">$845 paid and held until the job is signed off</div>
       </div>
-      <p class="example-note">Example job for illustration. Business names are made up.</p>
-    </div>
+      <figcaption>Example only. Business names are made up.</figcaption>
+    </figure>
   </div>
 </section>
 
 <section class="section">
   <div class="wrap">
-    <div class="section-head">
-      <h2>How it works</h2>
-      <a href="/how-it-works">More detail &rarr;</a>
-    </div>
+    <h2>How it works</h2>
     <ol class="steps">
       <li>
         <h3>Post your job</h3>
-        <p>Say what needs doing, where, and roughly when. Photos help tradies give you a proper price instead of a guess.</p>
+        <p>Say what needs doing and where. Photos help tradies give you a proper price.</p>
       </li>
       <li>
-        <h3>Get quotes</h3>
-        <p>Checked tradies who cover your area send a fixed price and a note on what's included. Compare them side by side.</p>
+        <h3>Compare quotes</h3>
+        <p>Tradies who cover your area send a fixed price. Every one has had their ABN and insurance checked.</p>
       </li>
       <li>
         <h3>Accept and pay</h3>
-        <p>Pick the one you like. Pay by card and we hold the money. The tradie can see it's there before they start.</p>
+        <p>Pay by card when you accept. We hold the money, and only the tradie you pick gets your details.</p>
       </li>
       <li>
-        <h3>Sign it off</h3>
-        <p>Once the work's done and you're happy, tap release. The tradie gets paid and you leave a review.</p>
+        <h3>Release when it's done</h3>
+        <p>Once you're happy with the work, release the payment and leave a review.</p>
       </li>
     </ol>
+    <p class="section-link"><a href="/how-it-works">More about how it works</a></p>
   </div>
 </section>
 
 <section class="section">
   <div class="wrap">
-    <div class="section-head">
-      <h2>What do you need done?</h2>
-    </div>
+    <h2>What do you need done?</h2>
     <ul class="trade-list">
       <% TRADES.filter(t => t.slug !== 'other').forEach(t => { %>
         <li><a href="/jobs/new?trade=<%= t.slug %>"><%= t.name %></a></li>
       <% }) %>
-      <li><a href="/jobs/new?trade=other">Not sure / something else</a></li>
-    </ul>
-  </div>
-</section>
-
-<section class="section">
-  <div class="wrap split">
-    <div>
-      <span class="eyebrow">Why use ezbuild</span>
-      <h2>Built the way we'd want it if it was our own house.</h2>
-      <p class="muted" style="max-width:440px">We're a Perth family with a tiler in it. We've seen both sides: customers who got burnt paying upfront, and tradies chasing invoices for weeks. This fixes both.</p>
-    </div>
-    <ul class="plain-list">
-      <li><strong>Every tradie is checked</strong><span>We look up their ABN, trade licence where one's required, and public liability insurance before they can quote.</span></li>
-      <li><strong>Your money is held, not handed over</strong><span>You pay when you accept a quote. The tradie is paid when you confirm the job's finished.</span></li>
-      <li><strong>Your phone won't ring off the hook</strong><span>Contact details are only shared with the one tradie you choose.</span></li>
-      <li><strong>Free for customers</strong><span>Posting a job and getting quotes costs nothing. Tradies pay a small cut on jobs they win.</span></li>
+      <li><a href="/jobs/new?trade=other">Something else</a></li>
     </ul>
   </div>
 </section>
@@ -101,13 +75,11 @@
 <% if (jobs.length) { %>
 <section class="section">
   <div class="wrap">
-    <div class="section-head">
-      <h2>Latest jobs</h2>
-      <a href="/jobs">All open jobs &rarr;</a>
-    </div>
+    <h2>Latest jobs</h2>
     <div class="job-rows">
       <% jobs.forEach(job => { %><%- include('../partials/job-row', { job }) %><% }) %>
     </div>
+    <p class="section-link"><a href="/jobs">See all open jobs</a></p>
   </div>
 </section>
 <% } %>
@@ -115,46 +87,16 @@
 <section class="band">
   <div class="wrap split">
     <div>
-      <span class="eyebrow">For tradies</span>
-      <h2>No lead fees. <%= feePercent %>% when you get paid.</h2>
-      <p style="max-width:460px">Other sites charge you for every lead, whether you win the job or not. We don't. Quote on whatever suits you. If you win the work, we take <%= feePercent %>% when the customer releases payment, and the rest goes to your bank account.</p>
-      <div class="ctas" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:28px">
-        <a class="btn big" href="/signup?as=tradie">Join as a tradie</a>
-        <a class="btn ghost big" href="/for-tradies">How it works for tradies</a>
-      </div>
+      <h2>Tradies: no lead fees</h2>
+      <p>Seeing jobs and quoting is free. If you win the work, we take <%= feePercent %>% when the customer releases payment and the rest goes to your bank.</p>
+      <p style="margin-top:24px"><a class="btn" href="/signup?as=tradie">Join as a tradie</a></p>
     </div>
     <div>
-      <span class="eyebrow">On a $1,200 job</span>
       <div class="sum">
-        <div><span class="label-col">Your quote</span><span><%= money(120000) %></span></div>
-        <div><span class="label-col">ezbuild fee (<%= feePercent %>%)</span><span>&minus;<%= money(feeFor(120000)) %></span></div>
-        <div><span>Paid to you</span><span><%= money(120000 - feeFor(120000)) %></span></div>
+        <div><span class="label-col">Quote</span><span><%= money(120000) %></span></div>
+        <div><span class="label-col">Our fee (<%= feePercent %>%)</span><span>&minus;<%= money(feeFor(120000)) %></span></div>
+        <div><span>You get</span><span><%= money(120000 - feeFor(120000)) %></span></div>
       </div>
-      <p class="small" style="margin-top:14px">No sign-up fee, no monthly fee, nothing for quotes you don't win.</p>
-    </div>
-  </div>
-</section>
-
-<section class="section" style="border-top:0">
-  <div class="wrap narrow">
-    <h2 style="margin-bottom:24px">Questions</h2>
-    <div class="faq">
-      <details>
-        <summary>Does it cost anything to post a job?</summary>
-        <p>No. Posting and getting quotes is free. You only pay the price you agreed with the tradie.</p>
-      </details>
-      <details>
-        <summary>What happens to my money after I pay?</summary>
-        <p>We hold it through Stripe, one of the world's largest payment processors. It's only released to the tradie when you confirm the job is done. If something goes wrong, email us and we'll step in before anyone gets paid.</p>
-      </details>
-      <details>
-        <summary>Which areas do you cover?</summary>
-        <p>The Perth metro area, from Two Rocks down to Mandurah and out to the hills. We're starting here and doing it properly before going anywhere else.</p>
-      </details>
-      <details>
-        <summary>Can I use it for big jobs like a renovation?</summary>
-        <p>Yes. For larger jobs, talk to the tradie about staging the work. Each stage can be posted and paid as its own job.</p>
-      </details>
     </div>
   </div>
 </section>
