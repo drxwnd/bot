@@ -3,7 +3,8 @@ const db = require('../db');
 const C = require('../constants');
 const payments = require('../payments');
 const { validAbn, list } = require('../helpers');
-const { flash, requireLogin, requireRole } = require('../middleware');
+const { flash, requireLogin, requireRole, requireCan } = require('../middleware');
+const { can } = require('../permissions');
 
 const router = express.Router();
 
@@ -43,20 +44,24 @@ router.get('/dashboard', requireLogin, (req, res) => {
   const user = req.user;
   if (user.role === 'admin') return res.redirect('/admin');
 
+  const accountId = req.account.ownerId;
   if (user.role === 'customer') {
-    return res.render('pages/dash-customer', { title: 'Your jobs', jobs: q.customerJobs.all(user.id) });
+    return res.render('pages/dash-customer', { title: 'Your jobs', jobs: q.customerJobs.all(accountId) });
   }
+
+  // Workers only see the jobs assigned to them.
+  if (!can(req, 'quote')) return res.redirect('/work');
 
   const profile = user.profile;
   res.render('pages/dash-tradie', {
     title: 'Dashboard',
     profile,
-    quotes: q.tradieQuotes.all(user.id),
+    quotes: q.tradieQuotes.all(accountId),
     matches:
       profile && profile.status === 'approved'
-        ? q.matchingJobs.all({ trades: profile.trades, regions: profile.regions, sectors: profile.sectors, uid: user.id })
+        ? q.matchingJobs.all({ trades: profile.trades, regions: profile.regions, sectors: profile.sectors, uid: accountId })
         : [],
-    paidOut: q.earnings.get(user.id).paid_out,
+    paidOut: q.earnings.get(accountId).paid_out,
   });
 });
 
@@ -73,18 +78,19 @@ function prefillFromQuiz(intent, base) {
   };
 }
 
-router.get('/dashboard/profile', requireRole('tradie'), (req, res) => {
+router.get('/dashboard/profile', requireRole('tradie'), requireCan('profile'), (req, res) => {
   const p = req.user.profile;
+  const owner = req.account.owner;
   const values = p
-    ? { ...p, sectors: p.sectors.split(','), trades: p.trades.split(','), regions: p.regions.split(','), name: req.user.name, phone: req.user.phone }
-    : prefillFromQuiz(req.session.intent, { name: req.user.name, phone: req.user.phone });
+    ? { ...p, sectors: p.sectors.split(','), trades: p.trades.split(','), regions: p.regions.split(','), name: owner.name, phone: owner.phone }
+    : prefillFromQuiz(req.session.intent, { name: owner.name, phone: owner.phone });
   res.render('pages/profile-edit', { title: 'Business details', values });
 });
 
-router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
+router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), (req, res) => {
   const b = req.body;
   const values = {
-    user_id: req.user.id,
+    user_id: req.account.ownerId,
     name: String(b.name || '').trim(),
     phone: String(b.phone || '').trim(),
     business_name: String(b.business_name || '').trim().slice(0, 100),
@@ -113,7 +119,7 @@ router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
 
   req.session.intent = null;
   db.transaction(() => {
-    q.updateUser.run(values.name, values.phone || null, req.user.id);
+    q.updateUser.run(values.name, values.phone || null, req.account.ownerId);
     q.upsertProfile.run({
       ...values,
       sectors: values.sectors.join(','),
@@ -134,7 +140,7 @@ router.post('/dashboard/profile', requireRole('tradie'), (req, res) => {
 
 // ---- Payouts ----
 
-router.get('/dashboard/payouts', requireRole('tradie'), async (req, res, next) => {
+router.get('/dashboard/payouts', requireRole('tradie'), requireCan('payouts'), async (req, res, next) => {
   const profile = req.user.profile;
   if (!profile) return res.redirect('/dashboard/profile');
   try {
@@ -162,11 +168,11 @@ async function startOnboarding(req, res, next) {
     next(err);
   }
 }
-router.post('/dashboard/payouts/start', requireRole('tradie'), startOnboarding);
+router.post('/dashboard/payouts/start', requireRole('tradie'), requireCan('payouts'), startOnboarding);
 // Stripe sends people back here if an onboarding link expires.
-router.get('/dashboard/payouts/start', requireRole('tradie'), startOnboarding);
+router.get('/dashboard/payouts/start', requireRole('tradie'), requireCan('payouts'), startOnboarding);
 
-router.post('/dashboard/payouts/stripe', requireRole('tradie'), async (req, res, next) => {
+router.post('/dashboard/payouts/stripe', requireRole('tradie'), requireCan('payouts'), async (req, res, next) => {
   try {
     const url = await payments.payoutDashboardLink(req.user.profile || {});
     res.redirect(303, url || '/dashboard/payouts');

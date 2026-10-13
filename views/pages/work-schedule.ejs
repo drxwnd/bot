@@ -1,0 +1,50 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow"><%= user.profile ? user.profile.business_name : '' %></span>
+    <h1>Schedule</h1>
+  </div>
+  <%- include('../partials/work-tabs') %>
+
+  <div class="page" style="padding-top:24px">
+    <div class="week-nav">
+      <a class="btn ghost small" href="/work/schedule?week=<%= prev %>">Previous week</a>
+      <strong><%= dayLabel(from, { day: 'numeric', month: 'short' }) %> to <%= dayLabel(to, { day: 'numeric', month: 'short', year: 'numeric' }) %></strong>
+      <a class="btn ghost small" href="/work/schedule?week=<%= next %>">Next week</a>
+    </div>
+
+    <div class="week">
+      <% days.forEach(d => { %>
+        <div class="day <%= d.date === today ? 'today' : '' %>">
+          <div class="day-head">
+            <span><%= dayLabel(d.date, { weekday: 'short' }) %></span>
+            <strong><%= dayLabel(d.date, { day: 'numeric', month: 'short' }) %></strong>
+          </div>
+          <% d.items.forEach(w => { %>
+            <a class="slot ws-<%= w.status %>" href="/work/<%= w.id %>">
+              <% if (w.scheduled_time) { %><span class="slot-time"><%= w.scheduled_time %></span><% } %>
+              <strong><%= w.title %></strong>
+              <span><%= w.assigned_name || 'Unassigned' %></span>
+            </a>
+          <% }) %>
+          <% if (can('work.manage')) { %><a class="slot-add" href="/work/new?date=<%= d.date %>">+ Add</a><% } %>
+        </div>
+      <% }) %>
+    </div>
+
+    <% if (unscheduled.length) { %>
+      <h2 style="font-size:1.3rem;margin-top:40px">Not booked in yet</h2>
+      <div class="job-rows">
+        <% unscheduled.forEach(w => { %>
+          <a class="job-row" href="/work/<%= w.id %>">
+            <span class="n"><%= w.source === 'tradebench' ? 'TB' : 'Private' %></span>
+            <span class="t"><%= w.title %></span>
+            <span class="r"><%= w.assigned_name || 'Unassigned' %></span>
+            <span class="m"><span><%= w.client_name %></span><span><%= w.address %></span></span>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('../partials/foot') %>

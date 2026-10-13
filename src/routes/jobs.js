@@ -11,7 +11,22 @@ const payments = require('../payments');
 const { parseDollars } = require('../helpers');
 const seo = require('../seo');
 const { locate, errorMessage } = require('../locality');
-const { flash, verifyCsrf, requireLogin, requireRole, requireApprovedTradie } = require('../middleware');
+const { flash, verifyCsrf, requireLogin, requireRole, requireCan, requireApprovedTradie } = require('../middleware');
+const { can } = require('../permissions');
+
+// Customer-side actions on a job. Admins act with the money permission instead.
+function allowed(req, action) {
+  return req.user.role === 'admin' ? can(req, 'money') : can(req, action);
+}
+
+function requireJobAction(action, message) {
+  return (req, res, next) => {
+    if (allowed(req, action)) return next();
+    flash(req, 'error', message);
+    res.redirect(`/jobs/${req.params.id}`);
+  };
+}
+const MANAGER_ONLY = 'Only a manager or the account owner can do that. Ask them to take a look.';
 
 const router = express.Router();
 
@@ -79,7 +94,7 @@ function loadJob(req, res, next) {
 }
 
 function ownsJob(req, res, next) {
-  if (req.user.id === req.job.customer_id || req.user.role === 'admin') return next();
+  if (req.account.ownerId === req.job.customer_id || req.user.role === 'admin') return next();
   res.status(403).render('pages/error', { title: 'Not your job', message: 'Only the person who posted this job can do that.' });
 }
 
@@ -142,12 +157,13 @@ router.get('/jobs/new', (req, res) => {
 router.post(
   '/jobs',
   requireRole('customer', 'admin'),
+  requireCan('post'),
   upload.array('photos', 6),
   verifyCsrf,
   (req, res) => {
     const b = req.body;
     const values = {
-      customer_id: req.user.id,
+      customer_id: req.account.ownerId,
       sector: C.sectorName[b.sector] ? b.sector : '',
       title: String(b.title || '').trim().slice(0, 120),
       trade: String(b.trade || ''),
@@ -207,7 +223,7 @@ router.get('/api/locate', (req, res) => {
 router.get('/jobs/:id', loadJob, (req, res) => {
   const job = req.job;
   const user = req.user;
-  const isOwner = user && (user.id === job.customer_id || user.role === 'admin');
+  const isOwner = user && (req.account.ownerId === job.customer_id || user.role === 'admin');
   const isTradie = user && user.role === 'tradie';
 
   if (job.status === 'cancelled' && !isOwner) {
@@ -215,9 +231,15 @@ router.get('/jobs/:id', loadJob, (req, res) => {
   }
 
   const quotes = isOwner ? q.quotesForJob.all(job.id) : [];
-  const myQuote = isTradie ? q.myQuote.get(job.id, user.id) : null;
+  const myQuote = isTradie ? q.myQuote.get(job.id, req.account.ownerId) : null;
   const accepted = job.accepted_quote_id ? q.quote.get(job.accepted_quote_id) : null;
-  const isAwardedTradie = Boolean(accepted && user && accepted.tradie_id === user.id);
+  const isAwardedTradie = Boolean(accepted && user && accepted.tradie_id === req.account.ownerId);
+
+  // Workers see their jobs in the Work area, which leaves out prices.
+  if (isTradie && !can(req, 'quote')) {
+    const work = isAwardedTradie && db.prepare('SELECT id FROM work_orders WHERE job_id = ?').get(job.id);
+    return res.redirect(work ? `/work/${work.id}` : '/work');
+  }
 
   // Only the job owner, the winning tradie and admins see anything past "taking quotes".
   if (job.status !== 'open' && !isOwner && !isAwardedTradie) {
@@ -248,6 +270,8 @@ router.get('/jobs/:id', loadJob, (req, res) => {
     awardedTradie,
     isOwner,
     isTradie,
+    canAccept: Boolean(isOwner && allowed(req, 'accept')),
+    canPay: Boolean(isOwner && allowed(req, 'pay')),
     isAwardedTradie,
     payment: payments.paymentForJob(job.id),
     review: q.review.get(job.id),
@@ -257,7 +281,7 @@ router.get('/jobs/:id', loadJob, (req, res) => {
   });
 });
 
-router.post('/jobs/:id/cancel', requireLogin, loadJob, ownsJob, (req, res) => {
+router.post('/jobs/:id/cancel', requireLogin, loadJob, ownsJob, requireJobAction('accept', MANAGER_ONLY), (req, res) => {
   const payment = payments.paymentForJob(req.job.id);
   if (payment && payment.status !== 'pending') {
     flash(req, 'error', `This job has been paid. Email ${config.supportEmail} and we'll sort out a refund.`);
@@ -273,7 +297,7 @@ router.post('/jobs/:id/cancel', requireLogin, loadJob, ownsJob, (req, res) => {
 
 // ---- Quotes ----
 
-router.post('/jobs/:id/quotes', requireRole('tradie'), requireApprovedTradie, loadJob, (req, res) => {
+router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requireApprovedTradie, loadJob, (req, res) => {
   const job = req.job;
   if (job.status !== 'open') {
     flash(req, 'error', 'This job is no longer taking quotes.');
@@ -288,15 +312,15 @@ router.post('/jobs/:id/quotes', requireRole('tradie'), requireApprovedTradie, lo
   } else if (message.length < 20) {
     flash(req, 'error', "Add a short note about what's included so the customer can compare quotes.");
   } else {
-    q.insertQuote.run(job.id, req.user.id, amount, message, start);
+    q.insertQuote.run(job.id, req.account.ownerId, amount, message, start);
     flash(req, 'success', 'Quote sent. The customer will see it on their job page.');
   }
   res.redirect(`/jobs/${job.id}#quote`);
 });
 
-router.post('/quotes/:id/withdraw', requireRole('tradie'), (req, res) => {
+router.post('/quotes/:id/withdraw', requireRole('tradie'), requireCan('quote'), (req, res) => {
   const quote = q.quote.get(Number(req.params.id));
-  if (quote && quote.tradie_id === req.user.id) {
+  if (quote && quote.tradie_id === req.account.ownerId) {
     q.withdrawQuote.run(quote.id);
     flash(req, 'success', 'Quote withdrawn.');
     return res.redirect(`/jobs/${quote.job_id}`);
@@ -308,7 +332,11 @@ router.post('/quotes/:id/accept', requireLogin, (req, res, next) => {
   const quote = q.quote.get(Number(req.params.id));
   const job = quote && q.job.get(quote.job_id);
   if (!job) return next();
-  if (job.customer_id !== req.user.id && req.user.role !== 'admin') return res.redirect('/dashboard');
+  if (job.customer_id !== req.account.ownerId && req.user.role !== 'admin') return res.redirect('/dashboard');
+  if (!allowed(req, 'accept')) {
+    flash(req, 'error', MANAGER_ONLY);
+    return res.redirect(`/jobs/${job.id}`);
+  }
 
   if (job.status !== 'open' || quote.status !== 'pending') {
     flash(req, 'error', 'That quote can no longer be accepted.');
@@ -325,7 +353,7 @@ router.post('/quotes/:id/accept', requireLogin, (req, res, next) => {
 
 // ---- Payment ----
 
-router.post('/jobs/:id/pay', requireLogin, loadJob, ownsJob, async (req, res, next) => {
+router.post('/jobs/:id/pay', requireLogin, loadJob, ownsJob, requireJobAction('pay', MANAGER_ONLY), async (req, res, next) => {
   const job = req.job;
   if (job.status !== 'awarded') return res.redirect(`/jobs/${job.id}`);
   try {
@@ -345,7 +373,7 @@ router.get('/jobs/:id/paid', requireLogin, loadJob, ownsJob, async (req, res, ne
   }
 });
 
-router.post('/jobs/:id/release', requireLogin, loadJob, ownsJob, async (req, res, next) => {
+router.post('/jobs/:id/release', requireLogin, loadJob, ownsJob, requireJobAction('pay', MANAGER_ONLY), async (req, res, next) => {
   const job = req.job;
   const payment = payments.paymentForJob(job.id);
   if (!payment || payment.status !== 'held') return res.redirect(`/jobs/${job.id}`);

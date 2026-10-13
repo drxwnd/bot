@@ -1,0 +1,67 @@
+<%- include('../partials/head') %>
+<div class="wrap page">
+  <div class="no-print invoice-bar">
+    <a href="/work/<%= work.id %>" class="small">Back to job</a>
+    <div class="actions">
+      <button type="button" class="btn ghost small" data-print>Print or save as PDF</button>
+      <% if (invoice.status === 'draft') { %>
+        <form method="post" action="/invoices/<%= invoice.id %>/status"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="status" value="sent"><button class="btn small">Mark as sent</button></form>
+      <% } %>
+      <% if (['draft', 'sent'].includes(invoice.status)) { %>
+        <form method="post" action="/invoices/<%= invoice.id %>/status"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="status" value="paid"><button class="btn accent small">Mark as paid</button></form>
+        <form method="post" action="/invoices/<%= invoice.id %>/status" data-confirm="Cancel this invoice? You can then create a new one."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="status" value="void"><button class="linkish danger small">Cancel invoice</button></form>
+      <% } %>
+    </div>
+  </div>
+
+  <article class="invoice-doc">
+    <header class="inv-head">
+      <div>
+        <h1><%= invoice.gst ? 'Tax invoice' : 'Invoice' %></h1>
+        <dl class="kv inv-meta">
+          <dt>Number</dt><dd class="mono"><%= invoice.number %></dd>
+          <dt>Date</dt><dd><%= dayLabel(invoice.issued_on, { day: 'numeric', month: 'long', year: 'numeric' }) %></dd>
+          <dt>Due</dt><dd><%= dayLabel(invoice.due_on, { day: 'numeric', month: 'long', year: 'numeric' }) %></dd>
+          <dt>Status</dt><dd><span class="tag inv-<%= invoice.status %>"><%= invoice.status %></span></dd>
+        </dl>
+      </div>
+      <div class="inv-from">
+        <strong><%= profile.business_name %></strong><br>
+        ABN <%= formatAbn(profile.abn) %><br>
+        <%= owner.name %><% if (owner.phone) { %> · <%= owner.phone %><% } %><br>
+        <%= owner.email %>
+      </div>
+    </header>
+
+    <div class="inv-to">
+      <span class="small muted">Bill to</span><br>
+      <strong><%= work.client_name %></strong><br>
+      <% if (work.address) { %><%= work.address %><br><% } %>
+      <% if (work.client_email) { %><%= work.client_email %><% } %>
+      <p class="small muted" style="margin:10px 0 0">For: <%= work.title %></p>
+    </div>
+
+    <table class="inv-lines">
+      <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th></tr></thead>
+      <tbody>
+        <% lines.forEach(l => { %>
+          <tr><td><%= l.description %></td><td class="num"><%= Number(l.quantity) %></td><td class="num"><%= money(l.unit_price_cents) %></td><td class="num"><%= money(Math.round(l.quantity * l.unit_price_cents)) %></td></tr>
+        <% }) %>
+      </tbody>
+      <tfoot>
+        <% if (invoice.gst) { %>
+          <tr><td colspan="3">Subtotal</td><td class="num"><%= money(totals.subtotal) %></td></tr>
+          <tr><td colspan="3">GST (10%)</td><td class="num"><%= money(totals.gst) %></td></tr>
+        <% } %>
+        <tr class="inv-total"><td colspan="3">Total<%= invoice.gst ? ' inc. GST' : '' %></td><td class="num"><%= money(totals.total) %></td></tr>
+      </tfoot>
+    </table>
+
+    <% if (!invoice.gst) { %><p class="small muted">No GST has been charged.</p><% } %>
+    <% if (profile.payment_details) { %>
+      <div class="inv-pay"><strong>How to pay</strong><p class="prose" style="margin:6px 0 0"><%= profile.payment_details %></p></div>
+    <% } %>
+    <% if (invoice.notes) { %><p class="prose" style="margin-top:20px"><%= invoice.notes %></p><% } %>
+  </article>
+</div>
+<%- include('../partials/foot') %>

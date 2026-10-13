@@ -1,0 +1,93 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <h1><%= kind === 'admin' ? 'Tradebench staff' : 'Your team' %></h1>
+    <p>
+      <% if (kind === 'tradie') { %>Add the people who work in your business. Managers can quote and run jobs. Workers only see the jobs you assign them.<% } %>
+      <% if (kind === 'customer') { %>Add the people who post and manage jobs for your business. Staff can post jobs and compare quotes. Managers accept and pay.<% } %>
+      <% if (kind === 'admin') { %>Support staff can approve tradies and see everything, but can't release or refund money or add other staff.<% } %>
+    </p>
+  </div>
+
+  <div class="with-side page" style="padding-top:0">
+    <div>
+      <% if (newInvite) { %>
+        <div class="notice success">
+          <strong>Invite for <%= newInvite.name %> is ready.</strong> Send them this link by text or email. They'll set their own password.
+          <div class="copy-row">
+            <input type="text" readonly value="<%= inviteUrl(newInvite.token) %>" data-copy>
+            <button type="button" class="btn small" data-copy-btn>Copy link</button>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong><%= account.owner.name %></strong><br><span class="small muted"><%= account.owner.email %></span></td>
+              <td>Owner</td>
+              <td><span class="tag approved">Active</span></td>
+              <td></td>
+            </tr>
+            <% members.forEach(m => { %>
+              <tr>
+                <td><strong><%= m.name %></strong><br><span class="small muted"><%= m.email %></span></td>
+                <td>
+                  <form method="post" action="/team/<%= m.id %>/role" class="inline-select">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <select name="role" data-autosubmit aria-label="Role for <%= m.name %>">
+                      <% roles.forEach(r => { %><option value="<%= r.slug %>" <%= m.role === r.slug ? 'selected' : '' %>><%= r.name %></option><% }) %>
+                    </select>
+                    <noscript><button class="btn small ghost">Save</button></noscript>
+                  </form>
+                </td>
+                <td>
+                  <% if (m.status === 'invited') { %>
+                    <span class="tag pending">Invite sent</span>
+                    <div class="small"><a href="<%= inviteUrl(m.token) %>" data-copy-link>Copy invite link</a></div>
+                  <% } else { %>
+                    <span class="tag approved">Active</span>
+                  <% } %>
+                </td>
+                <td>
+                  <form method="post" action="/team/<%= m.id %>/remove" data-confirm="Remove <%= m.name %>? They won't be able to log in any more.">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <button class="linkish danger small">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <aside>
+      <form method="post" action="/team/invite" class="box">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <h3>Add someone</h3>
+        <div class="field">
+          <label for="name">Name</label>
+          <input id="name" name="name" type="text" required>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required>
+          <span class="hint">This becomes their login. It can't already have its own Tradebench account.</span>
+        </div>
+        <div class="field">
+          <span class="label">Role</span>
+          <div class="opts">
+            <% roles.forEach((r, i) => { %>
+              <label class="opt check"><input type="radio" name="role" value="<%= r.slug %>" <%= i === roles.length - 1 ? 'checked' : '' %>><strong><%= r.name %></strong><span><%= r.hint %></span></label>
+            <% }) %>
+          </div>
+        </div>
+        <button class="btn accent block">Create invite link</button>
+      </form>
+    </aside>
+  </div>
+</div>
+<%- include('../partials/foot') %>

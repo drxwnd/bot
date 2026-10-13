@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const payments = require('../payments');
 const { flash, requireRole } = require('../middleware');
+const { can } = require('../permissions');
 
 const router = express.Router();
 router.use(requireRole('admin'));
@@ -55,6 +56,10 @@ router.post('/tradies/:id/:action', (req, res, next) => {
 
 router.post('/payments/:id/:action', async (req, res, next) => {
   if (!['release', 'refund'].includes(req.params.action)) return next();
+  if (!can(req, 'money')) {
+    flash(req, 'error', "Support accounts can't release or refund payments. Ask the account owner.");
+    return res.redirect('/admin#payments');
+  }
   const payment = q.payment.get(Number(req.params.id));
   if (!payment) return res.redirect('/admin');
   try {

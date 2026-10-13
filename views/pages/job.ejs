@@ -48,7 +48,9 @@
           <% if (job.status === 'awarded') { %>
             <h3>Pay <%= money(awardedTradie.amount_cents) %> to lock it in</h3>
             <p class="small muted">We hold the money. The tradie can see it's been paid, but they don't receive it until you confirm the job is done.</p>
-            <% if (paymentsAvailable) { %>
+            <% if (!canPay) { %>
+              <div class="notice info" style="margin:0">A manager or the account owner needs to pay for this job.</div>
+            <% } else if (paymentsAvailable) { %>
               <form method="post" action="/jobs/<%= job.id %>/pay">
                 <input type="hidden" name="_csrf" value="<%= csrf %>">
                 <button class="btn accent">Pay by card</button>
@@ -60,10 +62,14 @@
           <% } else if (job.status === 'paid' && payment) { %>
             <h3><%= money(payment.amount_cents) %> held</h3>
             <p class="small muted">Paid <%= shortDate(payment.paid_at) %>. When the work is finished and you're happy with it, release the payment to the tradie. This can't be undone.</p>
+            <% if (canPay) { %>
             <form method="post" action="/jobs/<%= job.id %>/release" data-confirm="Release <%= money(payment.amount_cents) %> to <%= awardedTradie.business_name %>? Only do this once the job is finished.">
               <input type="hidden" name="_csrf" value="<%= csrf %>">
               <button class="btn">Job's done, release payment</button>
             </form>
+            <% } else { %>
+              <div class="notice info" style="margin:0">When the work's done, a manager or the account owner releases the payment.</div>
+            <% } %>
             <p class="small muted" style="margin:12px 0 0">Problem with the work? Don't release. Email <a href="mailto:<%= supportEmail %>?subject=Job %23<%= jobNo %>"><%= supportEmail %></a> and we'll help sort it out.</p>
           <% } else if (job.status === 'completed' && payment) { %>
             <h3>Paid and signed off</h3>
@@ -128,7 +134,9 @@
                 <% if (qt.start_date) { %>Can start <%= new Date(qt.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %> &middot; <% } %>
                 Sent <%= ago(qt.created_at) %> &middot; inc. GST
               </span>
-              <% if (job.status === 'open' && qt.status === 'pending') { %>
+              <% if (job.status === 'open' && qt.status === 'pending' && !canAccept) { %>
+                <span class="small">A manager accepts quotes</span>
+              <% } else if (job.status === 'open' && qt.status === 'pending') { %>
                 <form method="post" action="/quotes/<%= qt.id %>/accept" data-confirm="Accept this quote for <%= money(qt.amount_cents) %>? Other quotes will be declined.">
                   <input type="hidden" name="_csrf" value="<%= csrf %>">
                   <button class="btn small">Accept quote</button>
@@ -255,7 +263,7 @@
         </div>
       <% } %>
 
-      <% if (isOwner && ['open', 'awarded'].includes(job.status) && (!payment || payment.status === 'pending')) { %>
+      <% if (canAccept && ['open', 'awarded'].includes(job.status) && (!payment || payment.status === 'pending')) { %>
         <form method="post" action="/jobs/<%= job.id %>/cancel" style="margin-top:16px" data-confirm="Close this job? Tradies will no longer see it.">
           <input type="hidden" name="_csrf" value="<%= csrf %>">
           <button class="linkish danger small">Close this job</button>

@@ -1,0 +1,14 @@
+<%- include('../partials/head') %>
+<div class="wrap narrow page">
+  <h1>Add a private job</h1>
+  <p class="muted">For your own clients, outside Tradebench. There's no fee on private jobs. Track hours, materials and invoices here.</p>
+  <% if (typeof error !== 'undefined') { %><div class="notice error"><%= error %></div><% } %>
+  <form method="post" action="/work" class="box" style="margin-top:20px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <%- include('../partials/private-job-fields', { values }) %>
+    <hr>
+    <%- include('../partials/assign-fields', { values, team }) %>
+    <button class="btn accent big">Add job</button>
+  </form>
+</div>
+<%- include('../partials/foot') %>

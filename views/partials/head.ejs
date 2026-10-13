@@ -4,6 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 <%
+  // Links in the header for the logged-in person, depending on their account and role.
+  const accountLinks = [];
+  if (user) {
+    if (user.role === 'admin') accountLinks.push({ href: '/admin', label: 'Admin', match: '/admin' });
+    if (user.role === 'tradie') {
+      if (can('quote')) accountLinks.push({ href: '/dashboard', label: 'Dashboard', match: '/dashboard' });
+      accountLinks.push({ href: '/work', label: can('quote') ? 'Work' : 'My jobs', match: '/work' });
+    }
+    if (user.role === 'customer') accountLinks.push({ href: '/dashboard', label: account.role === 'owner' ? 'My jobs' : 'Jobs', match: '/dashboard' });
+    if (user.role !== 'admin' && can('team')) accountLinks.push({ href: '/team', label: 'Team', match: '/team' });
+  }
   const fullTitle = title ? `${title} | ${siteName}` : `${siteName} | Tradies for homes, hotels and mine sites in WA`;
   const metaDescription = typeof description !== 'undefined' && description ? description : 'Post a repair, maintenance or building job for a home, hotel or mine site in WA. Get quotes from checked tradies and pay only when the job is done.';
 %>
@@ -51,13 +62,12 @@
       <a href="/for-tradies" class="<%= path === '/for-tradies' ? 'on' : '' %>">For tradies</a>
       <div class="right">
         <% if (user) { %>
-          <% if (user.role === 'admin') { %><a href="/admin">Admin</a><% } %>
-          <a href="/dashboard" class="<%= path.startsWith('/dashboard') ? 'on' : '' %>"><%= user.role === 'tradie' ? 'Dashboard' : 'My jobs' %></a>
+          <% accountLinks.forEach(l => { %><a href="<%= l.href %>" class="<%= path.startsWith(l.match) ? 'on' : '' %>"><%= l.label %></a><% }) %>
           <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish" style="text-decoration:none;color:var(--ink-2)">Log out</button></form>
         <% } else { %>
           <a href="/login">Log in</a>
         <% } %>
-        <% if (!user || user.role !== 'tradie') { %>
+        <% if (!user || (user.role !== 'tradie' && can('post'))) { %>
           <a class="btn small" href="<%= user ? '/jobs/new' : '/start' %>"><%= user ? 'Post a job' : 'Get started' %></a>
         <% } %>
       </div>
@@ -66,14 +76,13 @@
     <details class="menu">
       <summary>Menu</summary>
       <div class="panel">
-        <% if (!user || user.role !== 'tradie') { %><a href="<%= user ? '/jobs/new' : '/start' %>"><strong><%= user ? 'Post a job' : 'Get started' %></strong></a><% } %>
+        <% if (!user || (user.role !== 'tradie' && can('post'))) { %><a href="<%= user ? '/jobs/new' : '/start' %>"><strong><%= user ? 'Post a job' : 'Get started' %></strong></a><% } %>
         <% SECTORS.forEach(s => { %><a href="<%= s.path %>"><%= s.name %></a><% }) %>
         <a href="/jobs">Browse jobs</a>
         <a href="/how-it-works">How it works</a>
         <a href="/for-tradies">For tradies</a>
         <% if (user) { %>
-          <% if (user.role === 'admin') { %><a href="/admin">Admin</a><% } %>
-          <a href="/dashboard"><%= user.role === 'tradie' ? 'Dashboard' : 'My jobs' %></a>
+          <% accountLinks.forEach(l => { %><a href="<%= l.href %>"><%= l.label %></a><% }) %>
           <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish" style="text-decoration:none">Log out</button></form>
         <% } else { %>
           <a href="/login">Log in</a>

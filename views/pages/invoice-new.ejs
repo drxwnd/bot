@@ -1,0 +1,39 @@
+<%- include('../partials/head') %>
+<div class="wrap narrow page">
+  <a href="/work/<%= work.id %>" class="small">Back to job</a>
+  <h1 style="margin-top:10px">New invoice</h1>
+  <p class="muted">For <strong><%= work.title %></strong>, <%= work.client_name %>. We've filled it in from the agreed price, or your hours and materials. Change anything you need.</p>
+  <% if (!profile.hourly_rate_cents && !work.price_cents) { %>
+    <div class="notice info">Set your hourly rate in <a href="/work/settings">settings</a> and we'll add labour from logged hours automatically.</div>
+  <% } %>
+
+  <form method="post" action="/work/<%= work.id %>/invoice" class="box">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="row">
+      <div class="field"><label for="issued_on">Date</label><input id="issued_on" name="issued_on" type="date" value="<%= issued_on %>"></div>
+      <div class="field"><label for="due_on">Due</label><input id="due_on" name="due_on" type="date" value="<%= due_on %>"></div>
+    </div>
+
+    <table class="lines">
+      <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price ($)</th></tr></thead>
+      <tbody>
+        <% const rows = lines.concat(Array.from({ length: Math.max(3, 8 - lines.length) }, () => ({}))); %>
+        <% rows.forEach(l => { %>
+          <tr>
+            <td><input name="line_description" type="text" value="<%= l.description || '' %>" aria-label="Description"></td>
+            <td><input name="line_quantity" type="text" inputmode="decimal" value="<%= l.quantity ?? '' %>" aria-label="Quantity" class="qty"></td>
+            <td><input name="line_price" type="text" inputmode="decimal" value="<%= l.unit_price != null ? Number(l.unit_price).toFixed(2) : '' %>" aria-label="Unit price"></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <p class="small muted"><%= profile.gst_registered ? 'Prices are ex GST. 10% GST is added on the invoice.' : "You're set as not registered for GST, so no GST is added. Change this in settings." %></p>
+
+    <div class="field">
+      <label for="notes">Notes <span class="hint" style="display:inline">(optional)</span></label>
+      <textarea id="notes" name="notes" style="min-height:70px" placeholder="e.g. Thanks for your business. 2-year workmanship warranty."></textarea>
+    </div>
+    <button class="btn accent big">Create invoice</button>
+  </form>
+</div>
+<%- include('../partials/foot') %>

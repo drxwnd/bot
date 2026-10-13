@@ -1,0 +1,30 @@
+<%- include('../partials/head') %>
+<div class="auth">
+  <span class="eyebrow">You've been invited</span>
+  <h1>Join <%= business %></h1>
+  <p class="muted">You'll be a <strong><%= roleName.toLowerCase() %></strong><% if (roleHint) { %>: <%= roleHint.charAt(0).toLowerCase() + roleHint.slice(1) %><% } %>.</p>
+  <% if (typeof error !== 'undefined') { %><div class="notice error"><%= error %></div><% } %>
+  <form method="post" action="/invite/<%= invite.token %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" value="<%= invite.email %>" disabled>
+      <span class="hint">You'll log in with this.</span>
+    </div>
+    <div class="field">
+      <label for="name">Your name</label>
+      <input id="name" name="name" type="text" required value="<%= invite.name %>">
+    </div>
+    <div class="field">
+      <label for="phone">Mobile <span class="hint" style="display:inline">(optional)</span></label>
+      <input id="phone" name="phone" type="tel">
+    </div>
+    <div class="field">
+      <label for="password">Choose a password</label>
+      <input id="password" name="password" type="password" minlength="8" required autocomplete="new-password">
+      <span class="hint">At least 8 characters.</span>
+    </div>
+    <button class="btn accent block big">Join the team</button>
+  </form>
+</div>
+<%- include('../partials/foot') %>

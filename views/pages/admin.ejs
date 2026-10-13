@@ -1,6 +1,9 @@
 <%- include('../partials/head') %>
 <div class="wrap page">
-  <h1>Admin</h1>
+  <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
+    <h1 style="margin:0">Admin</h1>
+    <% if (can('team')) { %><a class="btn ghost small" href="/team">Tradebench staff</a><% } else { %><span class="tag">Support access</span><% } %>
+  </div>
 
   <div class="stats" style="margin-top:24px">
     <div><span>Fees earned</span><b><%= money(totals.fees_earned) %></b></div>
@@ -52,7 +55,7 @@
             <td class="num"><%= money(p.fee_cents) %></td>
             <td><span class="tag <%= p.status %>"><%= p.status %></span></td>
             <td>
-              <% if (p.status === 'held') { %>
+              <% if (p.status === 'held' && can('money')) { %>
                 <div class="actions">
                   <form method="post" action="/admin/payments/<%= p.id %>/release" data-confirm="Release <%= money(p.amount_cents - p.fee_cents) %> to <%= p.business_name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn small">Release</button></form>
                   <form method="post" action="/admin/payments/<%= p.id %>/refund" data-confirm="Refund <%= money(p.amount_cents) %> to the customer and cancel the job?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ghost small">Refund</button></form>

@@ -74,9 +74,11 @@
         <div class="box">
           <h3>Your account</h3>
           <ul class="plain-list small" style="margin-top:8px">
+            <li><a href="/work">Work: jobs, schedule and invoices</a></li>
+            <% if (can('team')) { %><li><a href="/team">Team</a></li><% } %>
             <li><a href="/dashboard/profile">Business details</a></li>
-            <li><a href="/dashboard/payouts">Payouts</a> <%= profile && profile.payouts_enabled ? '· set up' : '· not set up' %></li>
-            <% if (profile && profile.status === 'approved') { %><li><a href="/tradies/<%= user.id %>">Your public profile</a></li><% } %>
+            <% if (can('payouts')) { %><li><a href="/dashboard/payouts">Payouts</a> <%= profile && profile.payouts_enabled ? '· set up' : '· not set up' %></li><% } %>
+            <% if (profile && profile.status === 'approved') { %><li><a href="/tradies/<%= account.ownerId %>">Your public profile</a></li><% } %>
           </ul>
         </div>
         <div class="box">

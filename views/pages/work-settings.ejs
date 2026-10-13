@@ -1,0 +1,34 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow"><%= profile.business_name %></span>
+    <h1>Invoice settings</h1>
+  </div>
+  <%- include('../partials/work-tabs') %>
+  <div class="page narrow" style="padding-top:24px;margin:0">
+    <form method="post" action="/work/settings" class="box">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="row">
+        <div class="field">
+          <label for="hourly_rate">Hourly rate ($)</label>
+          <input id="hourly_rate" name="hourly_rate" type="text" inputmode="decimal" value="<%= profile.hourly_rate_cents ? (profile.hourly_rate_cents / 100).toFixed(2) : '' %>" placeholder="e.g. 95">
+          <span class="hint">Used to add labour to invoices from logged hours.</span>
+        </div>
+        <div class="field">
+          <label for="invoice_prefix">Invoice number prefix</label>
+          <input id="invoice_prefix" name="invoice_prefix" type="text" maxlength="12" value="<%= profile.invoice_prefix || 'INV-' %>">
+        </div>
+      </div>
+      <div class="field">
+        <label class="opt check" style="font-weight:400"><input type="checkbox" name="gst_registered" value="1" <%= profile.gst_registered ? 'checked' : '' %>><strong>Registered for GST</strong><span>Adds 10% GST to invoices and titles them "Tax invoice". You must be registered with the ATO to charge GST.</span></label>
+      </div>
+      <div class="field">
+        <label for="payment_details">How clients pay you</label>
+        <textarea id="payment_details" name="payment_details" style="min-height:90px" placeholder="e.g. Bank transfer to BSB 123-456, account 12345678, Russo Tiling. Use the invoice number as the reference."><%= profile.payment_details || '' %></textarea>
+        <span class="hint">Printed on every invoice.</span>
+      </div>
+      <button class="btn accent">Save settings</button>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

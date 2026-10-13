@@ -1,0 +1,8 @@
+<nav class="tabs" aria-label="Work">
+  <a href="/work" class="<%= path === '/work' ? 'on' : '' %>">Jobs</a>
+  <a href="/work/schedule" class="<%= path === '/work/schedule' ? 'on' : '' %>">Schedule</a>
+  <% if (can('money')) { %><a href="/invoices" class="<%= path.startsWith('/invoices') ? 'on' : '' %>">Invoices</a><% } %>
+  <% if (can('quote')) { %><a href="/dashboard">Quotes &amp; leads</a><% } %>
+  <% if (can('team')) { %><a href="/team">Team</a><% } %>
+  <% if (can('money')) { %><a href="/work/settings" class="<%= path === '/work/settings' ? 'on' : '' %>">Settings</a><% } %>
+</nav>

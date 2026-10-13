@@ -117,4 +117,103 @@ addColumn('jobs', 'requirements', 'TEXT');
 addColumn('tradie_profiles', 'sectors', "TEXT NOT NULL DEFAULT 'housing'");
 addColumn('tradie_profiles', 'tickets', 'TEXT');
 
+// Admin accounts: 'owner' can do everything, 'support' can't move money or manage staff.
+addColumn('users', 'admin_level', 'TEXT');
+
+// Invoicing settings for a tradie business.
+addColumn('tradie_profiles', 'hourly_rate_cents', 'INTEGER');
+addColumn('tradie_profiles', 'gst_registered', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('tradie_profiles', 'payment_details', 'TEXT');
+addColumn('tradie_profiles', 'invoice_prefix', "TEXT NOT NULL DEFAULT 'INV-'");
+
+db.exec(`
+-- People who log in on behalf of an account: a tradie business, a customer business or the Tradebench admin.
+-- account_id is the owner's user id. user_id stays empty until the invite is accepted.
+CREATE TABLE IF NOT EXISTS team_members (
+  id         INTEGER PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id    INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  email      TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  role       TEXT NOT NULL,
+  token      TEXT UNIQUE,
+  status     TEXT NOT NULL DEFAULT 'invited' CHECK (status IN ('invited', 'active', 'removed')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- A job a tradie business is running: either won on Tradebench (job_id set) or their own private job.
+CREATE TABLE IF NOT EXISTS work_orders (
+  id             INTEGER PRIMARY KEY,
+  account_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source         TEXT NOT NULL CHECK (source IN ('tradebench', 'private')),
+  job_id         INTEGER UNIQUE REFERENCES jobs(id),
+  title          TEXT NOT NULL,
+  client_name    TEXT,
+  client_phone   TEXT,
+  client_email   TEXT,
+  address        TEXT,
+  description    TEXT,
+  price_cents    INTEGER,
+  status         TEXT NOT NULL DEFAULT 'new'
+                 CHECK (status IN ('new', 'scheduled', 'in_progress', 'done', 'invoiced', 'paid', 'cancelled')),
+  assigned_to    INTEGER REFERENCES users(id),
+  scheduled_date TEXT,
+  scheduled_time TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS work_orders_account ON work_orders(account_id, status);
+
+CREATE TABLE IF NOT EXISTS work_notes (
+  id         INTEGER PRIMARY KEY,
+  work_id    INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  body       TEXT,
+  photo      TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS time_entries (
+  id         INTEGER PRIMARY KEY,
+  work_id    INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  work_date  TEXT NOT NULL,
+  minutes    INTEGER NOT NULL CHECK (minutes > 0),
+  note       TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS work_costs (
+  id           INTEGER PRIMARY KEY,
+  work_id      INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  user_id      INTEGER NOT NULL REFERENCES users(id),
+  description  TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id         INTEGER PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  work_id    INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  number     TEXT NOT NULL,
+  issued_on  TEXT NOT NULL,
+  due_on     TEXT NOT NULL,
+  gst        INTEGER NOT NULL DEFAULT 0,
+  notes      TEXT,
+  status     TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'sent', 'paid', 'void')),
+  paid_on    TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (account_id, number)
+);
+
+CREATE TABLE IF NOT EXISTS invoice_lines (
+  id               INTEGER PRIMARY KEY,
+  invoice_id       INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  description      TEXT NOT NULL,
+  quantity         REAL NOT NULL,
+  unit_price_cents INTEGER NOT NULL,
+  position         INTEGER NOT NULL DEFAULT 0
+);
+`);
+
 module.exports = db;

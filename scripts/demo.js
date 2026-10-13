@@ -43,7 +43,7 @@ function tradie(email, name, phone, p) {
   return id;
 }
 
-user('admin@demo.local', 'Site Admin', '0400 000 000', 'admin');
+const admin = user('admin@demo.local', 'Site Admin', '0400 000 000', 'admin');
 
 // ---- Customers ----
 const sarah = user('sarah@demo.local', 'Sarah Mitchell', '0412 345 678', 'customer');
@@ -266,6 +266,83 @@ completed({ customer: greg, sector: 'mining', title: 'Service air con in site of
 completed({ customer: sarah, sector: 'housing', title: 'Repaint front fence and gate', trade: 'painting', address: '14 Grand Promenade, Bayswater WA 6053', budget: '500-2k', timing: 'month', description: 'Picket fence and gate, about 20m.', days: 80 },
   bayside, 1150, 'Sand, spot prime and two coats on the fence and gate.', 5, 'Looks brand new. Kate kept me updated the whole way through.', 71);
 
+
+// ---- Teams ----
+function member(accountId, email, name, role, kind, extra = {}) {
+  const id = user(email, name, extra.phone || null, kind, extra.company || null);
+  if (kind === 'admin') db.prepare("UPDATE users SET admin_level = 'support' WHERE id = ?").run(id);
+  db.prepare("INSERT INTO team_members (account_id, user_id, email, name, role, status) VALUES (?, ?, ?, ?, ?, 'active')")
+    .run(accountId, id, email, name, role);
+  return id;
+}
+const luca = member(russo, 'luca@demo.local', 'Luca Russo', 'worker', 'tradie', { phone: '0411 222 333' });
+const ana = member(russo, 'ana@demo.local', 'Ana Silva', 'worker', 'tradie', { phone: '0411 444 555' });
+member(russo, 'rosa@demo.local', 'Rosa Russo', 'manager', 'tradie');
+member(mia, 'jess@demo.local', 'Jess Taylor', 'staff', 'customer', { company: 'Coastal Stays Group' });
+member(admin, 'sam.support@demo.local', 'Sam Lee', 'support', 'admin');
+db.prepare("INSERT INTO team_members (account_id, email, name, role, token) VALUES (?, 'marco@demo.local', 'Marco Bianchi', 'worker', 'demo-invite-token')").run(russo);
+
+// ---- Job management for Russo Tiling ----
+db.prepare("UPDATE tradie_profiles SET hourly_rate_cents = 9500, gst_registered = 1, invoice_prefix = 'RT-', payment_details = ? WHERE user_id = ?")
+  .run('Bank transfer to Russo Tiling & Waterproofing, BSB 016-123, account 4455 6677. Please use the invoice number as the reference.', russo);
+
+const perth = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Perth' }).format(new Date());
+const dayOffset = (n) => {
+  const d = new Date(perth() + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+// Monday of this week, so the schedule always has something on it.
+const monday = (() => { const d = new Date(perth() + 'T00:00:00Z'); return dayOffset(-((d.getUTCDay() + 6) % 7)); })();
+const weekDay = (i) => { const d = new Date(monday + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + i); return d.toISOString().slice(0, 10); };
+
+function work(p) {
+  const id = Number(db.prepare(`
+    INSERT INTO work_orders (account_id, source, title, client_name, client_phone, client_email, address, description, price_cents, status, assigned_to, scheduled_date, scheduled_time)
+    VALUES (@account, 'private', @title, @client, @phone, @email, @address, @description, @price, @status, @assigned, @date, @time)`)
+    .run({ account: russo, phone: null, email: null, description: null, price: null, assigned: null, date: null, time: null, ...p }).lastInsertRowid);
+  return id;
+}
+const note = (w, u, body) => db.prepare('INSERT INTO work_notes (work_id, user_id, body) VALUES (?, ?, ?)').run(w, u, body);
+const hours = (w, u, date, minutes, n = null) => db.prepare('INSERT INTO time_entries (work_id, user_id, work_date, minutes, note) VALUES (?, ?, ?, ?, ?)').run(w, u, date, minutes, n);
+const cost = (w, u, d, dollars) => db.prepare('INSERT INTO work_costs (work_id, user_id, description, amount_cents) VALUES (?, ?, ?, ?)').run(w, u, d, Math.round(dollars * 100));
+
+const ensuite = work({ title: 'Retile ensuite floor and shower', client: 'Helen Park', phone: '0422 987 654', email: 'helen.park@example.com',
+  address: '21 Alexander Dr, Menora WA 6050', description: 'Ensuite about 2.1m x 1.6m. Lift existing tiles, re-waterproof the shower, lay 600x300 porcelain. Client supplying tiles.',
+  price: 3850 * 100, status: 'in_progress', assigned: luca, date: weekDay(1), time: '07:00' });
+hours(ensuite, luca, weekDay(0), 360, 'Demo, cleared old tiles and bedding');
+hours(ensuite, luca, weekDay(1), 300, 'Screed and waterproofing');
+cost(ensuite, luca, 'Waterproofing membrane and primer', 186.4);
+cost(ensuite, luca, 'Tile adhesive, 6 bags', 132);
+note(ensuite, luca, "Old screed was cracked near the waste, so I've redone that section. Membrane is curing, tiling tomorrow.");
+note(ensuite, russo, 'Helen will leave the key in the lockbox, code 4821.');
+
+const kitchen = work({ title: 'Kitchen splashback', client: 'Greenline Property', phone: '08 9201 4455', email: 'maintenance@example.com',
+  address: '9 Oxford St, Leederville WA 6007', description: 'Subway tile splashback, 3.2m. Unit is tenanted, call the tenant on arrival.',
+  status: 'scheduled', assigned: ana, date: weekDay(3), time: '08:30' });
+
+work({ title: 'Quote visit: alfresco tiling', client: 'Mark Ellis', phone: '0433 765 432', address: '14 Waterford Way, Ellenbrook WA 6069',
+  description: 'About 40 square metres of outdoor tiling. Wants a price on travertine and porcelain.', status: 'scheduled', assigned: russo, date: weekDay(2), time: '15:00' });
+
+work({ title: 'Regrout pool steps', client: 'Coral Bay Apartments', address: '30 West Coast Hwy, Scarborough WA 6019', status: 'new' });
+
+const laundry = work({ title: 'Laundry floor tiles', client: 'Priya Desai', phone: '0455 123 987', email: 'priya.d@example.com',
+  address: '6 Ivy St, Inglewood WA 6052', status: 'invoiced', assigned: ana, date: dayOffset(-9), time: '07:30' });
+hours(laundry, ana, dayOffset(-9), 420, 'Lifted vinyl, levelled, tiled');
+cost(laundry, ana, 'Porcelain tiles, 7 sqm', 315);
+cost(laundry, ana, 'Levelling compound', 58);
+
+const invoice = (workId, number, status, issued, due, lines) => {
+  const id = Number(db.prepare('INSERT INTO invoices (account_id, work_id, number, issued_on, due_on, gst, status, paid_on) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+    .run(russo, workId, number, issued, due, status, status === 'paid' ? due : null).lastInsertRowid);
+  lines.forEach(([d, qty, price], i) => db.prepare('INSERT INTO invoice_lines (invoice_id, description, quantity, unit_price_cents, position) VALUES (?, ?, ?, ?, ?)').run(id, d, qty, Math.round(price * 100), i));
+};
+invoice(laundry, 'RT-0002', 'sent', dayOffset(-8), dayOffset(6), [['Labour', 7, 95], ['Porcelain tiles, 7 sqm', 1, 315], ['Levelling compound', 1, 58]]);
+
+const bathroom = work({ title: 'Bathroom wall tiles', client: 'Chris Walker', address: '2 Lord St, Bassendean WA 6054', status: 'paid', assigned: luca, date: dayOffset(-21) });
+hours(bathroom, luca, dayOffset(-21), 480);
+invoice(bathroom, 'RT-0001', 'paid', dayOffset(-20), dayOffset(-6), [['Wall tiling, main bathroom', 1, 2400]]);
+
 console.log(`Demo data loaded:
   ${db.prepare('SELECT COUNT(*) n FROM tradie_profiles').get().n} tradie businesses, ${db.prepare('SELECT COUNT(*) n FROM jobs').get().n} jobs, ${db.prepare('SELECT COUNT(*) n FROM quotes').get().n} quotes, ${db.prepare('SELECT COUNT(*) n FROM reviews').get().n} reviews
 
@@ -276,4 +353,10 @@ Log in with any of these (password: password123):
   greg@demo.local       mining company (Ironbark Minerals)
   leanne@demo.local     property manager
   dan@demo.local        tiler (Russo Tiling & Waterproofing)
-  tom.kerr@demo.local   Pilbara air con tradie`);
+  tom.kerr@demo.local   Pilbara air con tradie
+
+Team logins:
+  rosa@demo.local       manager at Russo Tiling
+  luca@demo.local       worker at Russo Tiling (sees only his jobs)
+  jess@demo.local       staff at Coastal Stays Group (can't accept quotes)
+  sam.support@demo.local  Tradebench support staff (can't move money)`);

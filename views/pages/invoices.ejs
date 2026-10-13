@@ -1,0 +1,37 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow"><%= user.profile ? user.profile.business_name : '' %></span>
+    <h1>Invoices</h1>
+    <p>Invoices for your private jobs. Tradebench jobs are paid through the site, so they don't need one.</p>
+  </div>
+  <%- include('../partials/work-tabs') %>
+  <div class="page" style="padding-top:24px">
+    <div class="stats">
+      <div><span>Waiting to be paid</span><b><%= money(outstanding) %></b></div>
+      <div><span>Overdue</span><b><%= invoices.filter(i => i.overdue).length %></b></div>
+      <div><span>Paid</span><b><%= money(invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0)) %></b></div>
+    </div>
+    <% if (!invoices.length) { %>
+      <div class="empty"><strong>No invoices yet.</strong> Open a private job and click "Create invoice".</div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Invoice</th><th>Client</th><th>Due</th><th>Status</th><th class="num">Total</th></tr></thead>
+          <tbody>
+            <% invoices.forEach(i => { %>
+              <tr>
+                <td><a href="/invoices/<%= i.id %>" class="mono"><%= i.number %></a><br><span class="small muted"><%= i.title %></span></td>
+                <td><%= i.client_name %></td>
+                <td class="small"><%= dayLabel(i.due_on) %><% if (i.overdue) { %><br><span class="tag cancelled" style="color:var(--bad)">Overdue</span><% } %></td>
+                <td><span class="tag inv-<%= i.status %>"><%= i.status %></span></td>
+                <td class="num"><%= money(i.total) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('../partials/foot') %>

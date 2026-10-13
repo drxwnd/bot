@@ -1,0 +1,53 @@
+<%- include('../partials/head') %>
+<div class="wrap">
+  <div class="page-head" style="display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap">
+    <div>
+      <span class="eyebrow"><%= user.profile ? user.profile.business_name : '' %><% if (account.role !== 'owner') { %> · <%= account.roleName %><% } %></span>
+      <h1><%= manager ? 'Work' : 'My jobs' %></h1>
+    </div>
+    <% if (manager) { %><a class="btn accent" href="/work/new">Add a private job</a><% } %>
+  </div>
+  <%- include('../partials/work-tabs') %>
+
+  <div class="page" style="padding-top:24px">
+    <div class="filter-tabs">
+      <% [['active', 'Active'], ['done', 'Finished'], ['all', 'All']].forEach(([s, label]) => { %>
+        <a href="/work?status=<%= s %>" class="<%= status === s ? 'on' : '' %>"><%= label %></a>
+      <% }) %>
+    </div>
+
+    <% if (!items.length) { %>
+      <div class="empty">
+        <% if (manager) { %>
+          <strong>No <%= status === 'active' ? 'active ' : '' %>jobs yet.</strong>
+          Jobs you win on Tradebench show up here automatically. You can also add your own private jobs.
+        <% } else { %>
+          <strong>Nothing assigned to you right now.</strong>
+          When you're put on a job it'll show up here with the address and details.
+        <% } %>
+      </div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Job</th><th>When</th><th>Who</th><th>Status</th><% if (can('money')) { %><th class="num">Price</th><% } %></tr></thead>
+          <tbody>
+            <% items.forEach(w => { %>
+              <tr>
+                <td>
+                  <a href="/work/<%= w.id %>"><strong><%= w.title %></strong></a>
+                  <br><span class="small muted"><%= w.client_name %><% if (w.address) { %> · <%= w.address %><% } %></span>
+                  <br><span class="source <%= w.source %>"><%= w.source === 'tradebench' ? 'Tradebench job' : 'Private job' %></span>
+                </td>
+                <td class="small"><%= w.scheduled_date ? dayLabel(w.scheduled_date) : 'Not booked' %><% if (w.scheduled_time) { %><br><%= w.scheduled_time %><% } %></td>
+                <td class="small"><%= w.assigned_name || 'Unassigned' %></td>
+                <td><span class="tag ws-<%= w.status %>"><%= WORK_STATUS[w.status] %></span><% if (w.minutes) { %><br><span class="small muted"><%= hoursText(w.minutes) %> logged</span><% } %></td>
+                <% if (can('money')) { %><td class="num"><%= w.price_cents ? money(w.price_cents) : '' %></td><% } %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('../partials/foot') %>

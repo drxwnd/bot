@@ -48,3 +48,27 @@ document.addEventListener('submit', function (e) {
   });
   if (input.value) check();
 })();
+
+// Team page: copy invite links, and save a role change as soon as it's picked.
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('[data-copy-btn]');
+  var link = e.target.closest('[data-copy-link]');
+  if (!btn && !link) return;
+  e.preventDefault();
+  var text = btn ? btn.parentNode.querySelector('[data-copy]').value : link.href;
+  var done = function () {
+    var el = btn || link;
+    var old = el.textContent;
+    el.textContent = 'Copied';
+    setTimeout(function () { el.textContent = old; }, 1500);
+  };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+});
+
+document.addEventListener('change', function (e) {
+  if (e.target.matches('[data-autosubmit]')) e.target.form.submit();
+});
+
+document.addEventListener('click', function (e) {
+  if (e.target.closest('[data-print]')) window.print();
+});

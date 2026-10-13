@@ -1,0 +1,17 @@
+<div class="row">
+  <div class="field">
+    <label for="assigned_to">Assigned to</label>
+    <select id="assigned_to" name="assigned_to">
+      <option value="">Nobody yet</option>
+      <% team.forEach(t => { %><option value="<%= t.id %>" <%= Number(values.assigned_to) === t.id ? 'selected' : '' %>><%= t.name %></option><% }) %>
+    </select>
+  </div>
+  <div class="field">
+    <label for="scheduled_date">Date</label>
+    <input id="scheduled_date" name="scheduled_date" type="date" value="<%= values.scheduled_date || '' %>">
+  </div>
+</div>
+<div class="field" style="max-width:200px">
+  <label for="scheduled_time">Start time <span class="hint" style="display:inline">(optional)</span></label>
+  <input id="scheduled_time" name="scheduled_time" type="time" value="<%= values.scheduled_time || '' %>">
+</div>

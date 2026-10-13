@@ -76,6 +76,8 @@ app.use((req, res, next) => (req.is('multipart/form-data') ? next() : verifyCsrf
 
 app.use(require('./src/routes/seo'));
 app.use(require('./src/routes/start'));
+app.use(require('./src/routes/team'));
+app.use(require('./src/routes/work'));
 app.use(require('./src/routes/public'));
 app.use(require('./src/routes/auth'));
 app.use(require('./src/routes/jobs'));

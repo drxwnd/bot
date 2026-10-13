@@ -1,0 +1,169 @@
+<%- include('../partials/head') %>
+<%
+  const mapsUrl = work.address ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(work.address) : null;
+%>
+<div class="wrap">
+  <div class="page-head">
+    <a href="/work" class="small">Back to <%= manager ? 'work' : 'my jobs' %></a>
+    <h1 style="margin-top:10px"><%= work.title %></h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <span class="tag ws-<%= work.status %>"><%= WORK_STATUS[work.status] %></span>
+      <span class="source <%= work.source %>"><%= work.source === 'tradebench' ? 'Tradebench job' : 'Private job' %></span>
+      <% if (work.scheduled_date) { %><span class="tag"><%= dayLabel(work.scheduled_date, { weekday: 'long', day: 'numeric', month: 'short' }) %><%= work.scheduled_time ? ', ' + work.scheduled_time : '' %></span><% } %>
+    </div>
+  </div>
+
+  <div class="with-side page" style="padding-top:0">
+    <div>
+      <% if (!manager && ['new', 'scheduled', 'in_progress'].includes(work.status)) { %>
+        <div class="box" style="margin-bottom:24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <strong style="margin-right:auto">Update the job</strong>
+          <% if (work.status !== 'in_progress') { %>
+            <form method="post" action="/work/<%= work.id %>/status"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="status" value="in_progress"><button class="btn">Start job</button></form>
+          <% } %>
+          <form method="post" action="/work/<%= work.id %>/status" data-confirm="Mark this job as done?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="status" value="done"><button class="btn accent">Mark as done</button></form>
+        </div>
+      <% } %>
+
+      <% if (work.description) { %>
+        <h2 class="h-sm">Job details</h2>
+        <p class="prose"><%= work.description %></p>
+      <% } %>
+
+      <h2 class="h-sm" id="notes">Notes and photos</h2>
+      <form method="post" action="/work/<%= work.id %>/notes" enctype="multipart/form-data" class="box note-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <textarea name="body" placeholder="What did you find? What's left to do? Anything the next person should know?" style="min-height:80px"></textarea>
+        <div class="note-actions">
+          <label class="file-pick">Add a photo <input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/heic"></label>
+          <button class="btn small">Post</button>
+        </div>
+      </form>
+      <% if (!notes.length) { %><p class="small muted">No notes yet. Before and after photos are worth adding.</p><% } %>
+      <% notes.forEach(n => { %>
+        <div class="note">
+          <div class="small muted"><strong style="color:var(--ink)"><%= n.author %></strong> · <%= ago(n.created_at) %></div>
+          <% if (n.body) { %><p class="prose" style="margin:6px 0 0"><%= n.body %></p><% } %>
+          <% if (n.photo) { %><a href="/uploads/<%= n.photo %>" target="_blank" rel="noopener"><img src="/uploads/<%= n.photo %>" alt="Job photo" class="note-photo" loading="lazy"></a><% } %>
+        </div>
+      <% }) %>
+
+      <h2 class="h-sm" id="time" style="margin-top:40px">Hours <span class="muted mono" style="font-size:0.9rem">(<%= hoursText(minutes) || '0h' %>)</span></h2>
+      <form method="post" action="/work/<%= work.id %>/time" class="box inline-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field"><label for="work_date">Date</label><input id="work_date" name="work_date" type="date" value="<%= today %>"></div>
+        <div class="field"><label for="hours">Hours</label><input id="hours" name="hours" type="text" inputmode="decimal" placeholder="e.g. 3.5" required></div>
+        <div class="field grow"><label for="tnote">Note <span class="hint" style="display:inline">(optional)</span></label><input id="tnote" name="note" type="text" placeholder="e.g. Prep and waterproofing"></div>
+        <button class="btn small">Log hours</button>
+      </form>
+      <% if (time.length) { %>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <% time.forEach(t => { %>
+                <tr>
+                  <td class="small"><%= dayLabel(t.work_date) %></td>
+                  <td><%= t.author %><% if (t.note) { %><br><span class="small muted"><%= t.note %></span><% } %></td>
+                  <td class="num"><%= hoursText(t.minutes) %></td>
+                  <td style="width:1%">
+                    <% if (t.user_id === user.id || manager) { %>
+                      <form method="post" action="/work/<%= work.id %>/time/<%= t.id %>/delete" data-confirm="Delete this entry?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish danger small">Delete</button></form>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <h2 class="h-sm" id="costs" style="margin-top:40px">Materials and costs<% if (showMoney) { %> <span class="muted mono" style="font-size:0.9rem">(<%= money(costTotal) %>)</span><% } %></h2>
+      <form method="post" action="/work/<%= work.id %>/costs" class="box inline-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field grow"><label for="cdesc">What</label><input id="cdesc" name="description" type="text" placeholder="e.g. Tile adhesive, 4 bags" required></div>
+        <div class="field"><label for="camount">Cost ($)</label><input id="camount" name="amount" type="text" inputmode="decimal" placeholder="64.50" required></div>
+        <button class="btn small">Add</button>
+      </form>
+      <% if (costs.length) { %>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <% costs.forEach(c => { %>
+                <tr>
+                  <td><%= c.description %><br><span class="small muted"><%= c.author %> · <%= ago(c.created_at) %></span></td>
+                  <td class="num"><%= money(c.amount_cents) %></td>
+                  <td style="width:1%">
+                    <% if (c.user_id === user.id || manager) { %>
+                      <form method="post" action="/work/<%= work.id %>/costs/<%= c.id %>/delete" data-confirm="Delete this cost?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish danger small">Delete</button></form>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <aside>
+      <div class="box">
+        <h3>Client</h3>
+        <dl class="kv">
+          <dt>Name</dt><dd><%= work.client_name || 'Not given' %></dd>
+          <% if (work.client_phone) { %><dt>Phone</dt><dd><a href="tel:<%= work.client_phone.replace(/\s/g, '') %>"><%= work.client_phone %></a></dd><% } %>
+          <% if (work.client_email && manager) { %><dt>Email</dt><dd><a href="mailto:<%= work.client_email %>"><%= work.client_email %></a></dd><% } %>
+        </dl>
+        <% if (work.address) { %>
+          <p style="margin:14px 0 0"><strong><%= work.address %></strong><br><a href="<%= mapsUrl %>" target="_blank" rel="noopener" class="small">Open in Google Maps</a></p>
+        <% } %>
+      </div>
+
+      <% if (manager) { %>
+        <form method="post" action="/work/<%= work.id %>" class="box">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <h3>Booking</h3>
+          <div class="field">
+            <label for="status">Status</label>
+            <select id="status" name="status">
+              <% Object.entries(WORK_STATUS).forEach(([k, v]) => { %><option value="<%= k %>" <%= work.status === k ? 'selected' : '' %>><%= v %></option><% }) %>
+            </select>
+          </div>
+          <%- include('../partials/assign-fields', { values: work, team }) %>
+          <% if (work.source === 'private') { %>
+            <details class="more"><summary>Edit job and client details</summary>
+              <div style="margin-top:12px"><%- include('../partials/private-job-fields', { values: work }) %></div>
+            </details>
+          <% } %>
+          <button class="btn block" style="margin-top:12px">Save</button>
+        </form>
+      <% } %>
+
+      <% if (showMoney && summary) { %>
+        <div class="box">
+          <h3>Money</h3>
+          <dl class="kv">
+            <dt><%= work.source === 'tradebench' ? 'Quote' : 'Price' %></dt><dd class="mono"><%= summary.income ? money(summary.income) : 'Hourly' %></dd>
+            <% if (summary.fee) { %><dt>Tradebench fee</dt><dd class="mono">&minus;<%= money(summary.fee) %></dd><% } %>
+            <dt>Materials</dt><dd class="mono">&minus;<%= money(summary.costTotal) %></dd>
+            <% if (summary.income) { %><dt><strong>Left over</strong></dt><dd class="mono"><strong><%= money(summary.left) %></strong></dd><% } %>
+            <dt>Hours logged</dt><dd class="mono"><%= hoursText(minutes) || '0h' %></dd>
+            <% if (summary.labour !== null) { %><dt>Labour at your rate</dt><dd class="mono"><%= money(summary.labour) %></dd><% } %>
+          </dl>
+          <% if (work.source === 'tradebench') { %>
+            <p class="small muted" style="margin:14px 0 0">
+              <% if (work.payment_status === 'held') { %>Customer has paid. The money is held until they sign off.
+              <% } else if (work.payment_status === 'released') { %>Paid out to your bank.
+              <% } else { %>Waiting for the customer to pay.<% } %>
+              <a href="/jobs/<%= work.job_id %>">View on Tradebench</a>
+            </p>
+          <% } else if (invoice) { %>
+            <a class="btn ghost block" style="margin-top:14px" href="/invoices/<%= invoice.id %>">View invoice <%= invoice.number %></a>
+          <% } else { %>
+            <a class="btn accent block" style="margin-top:14px" href="/work/<%= work.id %>/invoice">Create invoice</a>
+          <% } %>
+        </div>
+      <% } %>
+    </aside>
+  </div>
+</div>
+<%- include('../partials/foot') %>
