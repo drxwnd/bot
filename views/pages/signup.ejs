@@ -50,6 +50,6 @@
   </form>
   <p class="alt">Already have an account? <a href="/login<%= next ? '?next=' + encodeURIComponent(next) : '' %>">Log in</a></p>
 </div>
-<%- include('../partials/photo', { photo: as === 'tradie' ? 'electrician' : 'bathroomTiles', cls: 'auth-photo', eager: true }) %>
+<%- include('../partials/photo', { photo: as === 'tradie' ? 'perthSiteExcavator' : 'bathroomTiles', cls: as === 'tradie' ? 'auth-photo blend' : 'auth-photo', eager: true }) %>
 </div>
 <%- include('../partials/foot') %>

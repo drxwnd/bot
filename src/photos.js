@@ -1,7 +1,7 @@
 // Photos used around the site. All are Creative Commons and need the photographer credited,
 // which the photo partial does under each one and /photo-credits lists in full.
-// "BY-SA" photos must stay under the same licence if the image itself is edited, so they're
-// only resized here and cropped with CSS.
+// "BY-SA" photos must stay under the same licence if the image itself is edited, so photos are
+// only resized here, and cropped or faded with CSS.
 
 const PHOTOS = {
   bathroomTiles: {
@@ -34,25 +34,25 @@ const PHOTOS = {
     licenseUrl: 'https://creativecommons.org/licenses/by/2.0/',
     source: 'https://www.flickr.com/photos/38869431@N00/3795330063',
   },
-  electrician: {
-    file: 'apprentice-electrician.jpg',
-    width: 819,
-    height: 1024,
-    alt: 'Apprentice electrician in a hard hat wiring on a building site',
-    creator: 'Chris Hunkeler',
-    license: 'CC BY-SA 2.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0/',
-    source: 'https://www.flickr.com/photos/14913305@N00/7170645458',
+  perthSiteExcavator: {
+    file: 'perth-site-excavator.jpg',
+    width: 1280,
+    height: 721,
+    alt: 'Excavator and site fencing on a construction site in central Perth',
+    creator: "Greg O'Beirne",
+    license: 'CC BY 2.5',
+    licenseUrl: 'https://creativecommons.org/licenses/by/2.5/',
+    source: 'https://commons.wikimedia.org/w/index.php?curid=164543440',
   },
-  plumber: {
-    file: 'plumber-sealing.jpg',
-    width: 1024,
-    height: 683,
-    alt: 'Plumber sealing around a pipe at the base of a wall',
-    creator: 'Tim Evanson',
-    license: 'CC BY-SA 2.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0/',
-    source: 'https://www.flickr.com/photos/23165290@N00/16618512168',
+  perthSiteCranes: {
+    file: 'perth-site-cranes.jpg',
+    width: 1280,
+    height: 721,
+    alt: 'Cranes and site works in front of the Perth city skyline',
+    creator: "Greg O'Beirne",
+    license: 'CC BY 2.5',
+    licenseUrl: 'https://creativecommons.org/licenses/by/2.5/',
+    source: 'https://commons.wikimedia.org/w/index.php?curid=164543402',
   },
   pilbaraMine: {
     file: 'pilbara-mine-plant.jpg',

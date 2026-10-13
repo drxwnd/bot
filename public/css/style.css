@@ -2433,3 +2433,38 @@ aside .row {
     display: none;
   }
 }
+
+/* Construction site photos on the tradie pages: soft edges that blend into the page, and a
+   slow fade in when the page loads. */
+.photo.blend img {
+  border-radius: 0;
+  background: none;
+  -webkit-mask-image: radial-gradient(ellipse 62% 60% at 50% 50%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 60% at 50% 50%, #000 40%, transparent 100%);
+  animation: photo-in 1.6s ease-out 0.15s both;
+}
+
+.photo.blend figcaption {
+  text-align: center;
+}
+
+.auth-photo.blend img {
+  object-position: 42% 50%;
+}
+
+@keyframes photo-in {
+  from {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo.blend img {
+    animation: none;
+  }
+}
