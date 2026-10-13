@@ -9,7 +9,7 @@ const config = require('../config');
 const C = require('../constants');
 const payments = require('../payments');
 const notify = require('../notify');
-const { parseDollars } = require('../helpers');
+const { parseDollars, money } = require('../helpers');
 const seo = require('../seo');
 const { locate, errorMessage } = require('../locality');
 const { flash, verifyCsrf, requireLogin, requireRole, requireCan, requireApprovedTradie } = require('../middleware');
@@ -188,6 +188,7 @@ router.post(
     else if (values.description.length < 30) error = 'Describe the job in a bit more detail so tradies can price it properly.';
     else if (!values.address) error = 'Enter the address of the job. Only the suburb is shown publicly.';
     else if (!C.budgetName[values.budget]) error = 'Pick a rough budget.';
+    else if (config.maxQuoteCents && values.budget === 'over-50k') error = `For now we only take jobs up to ${money(config.maxQuoteCents)}. Bigger building jobs need a registered builder and a written contract.`;
     else if (!C.timingName[values.timing]) error = 'Pick when you need it done.';
 
     if (!error) {
@@ -313,6 +314,8 @@ router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requ
 
   if (!amount) {
     flash(req, 'error', 'Enter your price in dollars, e.g. 850 or 1,250.');
+  } else if (config.maxQuoteCents && amount > config.maxQuoteCents) {
+    flash(req, 'error', `Quotes on ${config.siteName} are limited to ${money(config.maxQuoteCents)} for now. Bigger building jobs in WA need a registered builder and a written contract, so arrange those directly.`);
   } else if (message.length < 20) {
     flash(req, 'error', "Add a short note about what's included so the customer can compare quotes.");
   } else {

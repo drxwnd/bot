@@ -6,7 +6,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 
 const config = require('./src/config');
-const { locals } = require('./src/helpers');
+const { locals, formatAbn } = require('./src/helpers');
 const { loadSession, verifyCsrf } = require('./src/middleware');
 const seo = require('./src/seo');
 const { TRADE_INFO, REGION_INFO } = require('./src/seo-content');
@@ -27,6 +27,9 @@ Object.assign(app.locals, locals, {
   REGION_INFO,
   PHOTOS,
   plausibleDomain: config.plausibleDomain,
+  businessAbn: config.businessAbn ? formatAbn(config.businessAbn) : '',
+  legalName: config.legalName,
+  maxQuoteCents: config.maxQuoteCents,
   jsonForScript: seo.jsonForScript,
 });
 

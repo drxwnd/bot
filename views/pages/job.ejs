@@ -231,6 +231,7 @@
                 <div class="field">
                   <label for="amount">Your price (AUD, inc. GST)</label>
                   <input id="amount" name="amount" type="text" inputmode="decimal" required placeholder="e.g. 850">
+                  <% if (maxQuoteCents) { %><span class="hint">Up to <%= money(maxQuoteCents) %></span><% } %>
                 </div>
                 <div class="field">
                   <label for="start_date">Earliest start <span class="hint" style="display:inline">(optional)</span></label>

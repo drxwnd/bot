@@ -43,7 +43,7 @@
       </div>
     </div>
     <div class="foot-base">
-      <span>&copy; <%= new Date().getFullYear() %> <%= siteName %>. Perth, Western Australia.</span>
+      <span>&copy; <%= new Date().getFullYear() %> <%= siteName %><% if (businessAbn) { %>, ABN <%= businessAbn %><% } %>. Perth, Western Australia.</span>
       <span>Card payments processed by Stripe.</span>
     </div>
   </div>

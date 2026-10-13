@@ -4,7 +4,7 @@
 const crypto = require('crypto');
 const config = require('./config');
 const C = require('./constants');
-const { money } = require('./helpers');
+const { money, formatAbn } = require('./helpers');
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -47,7 +47,8 @@ function layout({ subject, heading, lines, button, footer, unsubscribe }) {
       `<p style="margin:24px 0 8px"><a href="${esc(button.href)}" style="display:inline-block;background:#c8461b;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:3px">${esc(button.label)}</a></p>`,
     );
   }
-  const foot = [footer || `${config.siteName}, Perth, Western Australia. Reply to this email if you need a hand.`];
+  const abn = config.businessAbn ? ` ABN ${formatAbn(config.businessAbn)}.` : '';
+  const foot = [(footer ? footer + ' ' : '') + `${config.siteName}, Perth, Western Australia.${abn} Reply to this email if you need a hand.`];
   if (unsubscribe) foot.push(`Don't want these? Turn them off: ${unsubscribeUrl(unsubscribe)}`);
   textParts.push('--', ...foot);
 
@@ -114,7 +115,7 @@ const T = {
       heading: 'The customer went with another quote',
       lines: [
         `Thanks for quoting on "${job.title}" in ${job.suburb}. The customer picked someone else this time.`,
-        'New jobs come in every day. Keep your profile and photos up to date, as customers look at them when comparing.',
+        'New jobs come in every day. Keep your profile up to date, as customers look at it when comparing quotes.',
       ],
       button: { label: 'Browse open jobs', href: url('/jobs') },
     }),
@@ -137,7 +138,14 @@ const T = {
       heading: 'Payment received and held',
       lines: [
         `Thanks. We're holding ${money(payment.amount_cents + payment.customer_fee_cents)} for "${job.title}". ${business} has been told to go ahead, and now has your contact details to arrange a time.`,
-        { rows: [['Job', `${jobNo(job)} ${job.title}`], ['Tradie', business], ['Paid', money(payment.amount_cents + payment.customer_fee_cents)]] },
+        { rows: [
+          ['Job', `${jobNo(job)} ${job.title}`],
+          ['Tradie', business],
+          ...(payment.customer_fee_cents
+            ? [['Quote', money(payment.amount_cents)], ['Secure payment fee', money(payment.customer_fee_cents)]]
+            : []),
+          ['Paid', money(payment.amount_cents + payment.customer_fee_cents)],
+        ], total: true },
         "Nothing goes to the tradie until you tell us the job's done. If something goes wrong, reply to this email before you release the payment.",
       ],
       button: { label: 'View the job', href: url(`/jobs/${job.id}`) },
@@ -202,7 +210,7 @@ const T = {
       subject: `New tradie to check: ${profile.business_name}`,
       heading: `${profile.business_name} wants to join`,
       lines: [
-        { rows: [['Name', tradie.name], ['Email', tradie.email], ['ABN', profile.abn], ['Trades', profile.trades.split(',').map((t) => C.tradeName[t]).join(', ')], ['Licence', profile.licence_no || 'None given'], ['Insurer', `${profile.insurer || '?'} (expires ${profile.insurance_expiry || '?'})`]] },
+        { rows: [['Name', tradie.name], ['Email', tradie.email], ['ABN', formatAbn(profile.abn)], ['Trades', profile.trades.split(',').map((t) => C.tradeName[t]).join(', ')], ['Licence', profile.licence_no || 'None given'], ['Insurer', `${profile.insurer || '?'} (expires ${profile.insurance_expiry || '?'})`]] },
         'Check the ABN on abr.business.gov.au and the licence with Building and Energy WA before approving.',
       ],
       button: { label: 'Review in admin', href: url('/admin#tradies') },

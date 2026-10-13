@@ -84,8 +84,9 @@
           <label for="budget">Rough budget</label>
           <select id="budget" name="budget" required>
             <option value="">Choose one</option>
-            <% BUDGETS.forEach(b => { %><option value="<%= b.slug %>" <%= values.budget === b.slug ? 'selected' : '' %>><%= b.name %></option><% }) %>
+            <% BUDGETS.filter(b => !(maxQuoteCents && b.slug === 'over-50k')).forEach(b => { %><option value="<%= b.slug %>" <%= values.budget === b.slug ? 'selected' : '' %>><%= b.name %></option><% }) %>
           </select>
+          <% if (maxQuoteCents) { %><span class="hint">We take jobs up to <%= money(maxQuoteCents) %> for now.</span><% } %>
         </div>
         <div class="field">
           <label for="timing">When</label>

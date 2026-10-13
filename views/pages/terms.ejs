@@ -8,6 +8,7 @@
 
   <h2>1. What <%= siteName %> is</h2>
   <p><%= siteName %> is an online marketplace that connects people who need building, repair and maintenance work done ("customers") with independent tradespeople and businesses ("tradies") in Western Australia.</p>
+  <% if (legalName || businessAbn) { %><p>In these terms, "we" and "us" means <%= legalName || siteName %><% if (legalName) { %> trading as <%= siteName %><% } %><% if (businessAbn) { %> (ABN <%= businessAbn %>)<% } %>.</p><% } %>
   <p>We are not a builder or contractor and we don't do any of the work. The contract for the work is between the customer and the tradie. We provide the platform, check tradies' details, and hold payments until jobs are signed off.</p>
 
   <h2>2. Accounts</h2>

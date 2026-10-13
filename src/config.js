@@ -20,6 +20,10 @@ const config = {
   // Smallest fee taken on a job, in cents. Card and payout costs are partly fixed per job, so a
   // pure percentage loses money on small jobs. 0 turns it off.
   minFeeCents: Math.round(Number(process.env.MIN_FEE_DOLLARS || 0) * 100),
+  // Largest quote allowed, in cents. In WA, building work over $20,000 generally needs a registered
+  // builder, a written contract and (for homes) home indemnity insurance. Capping quotes keeps the
+  // platform to smaller jobs until you're set up for that. 0 means no cap.
+  maxQuoteCents: Math.round(Number(process.env.MAX_QUOTE_DOLLARS || 0) * 100),
   // Optional fee added on top for the customer at checkout ("secure payment fee"). 0 turns it off.
   customerFeePercent: Number(process.env.CUSTOMER_FEE_PERCENT || 0),
 
@@ -31,6 +35,11 @@ const config = {
 
   // Optional Plausible analytics: the domain as set up in Plausible, e.g. tradebench.au.
   plausibleDomain: process.env.PLAUSIBLE_DOMAIN || '',
+
+  // Your ABN and the legal name it's registered to (for a sole trader, your own name). Shown in the
+  // footer, terms, privacy page and emails once set.
+  businessAbn: String(process.env.BUSINESS_ABN || '').replace(/\D/g, ''),
+  legalName: process.env.LEGAL_NAME || '',
 
   adminEmail: (process.env.ADMIN_EMAIL || '').toLowerCase(),
   supportEmail: process.env.SUPPORT_EMAIL || 'hello@tradebench.au',
@@ -53,6 +62,7 @@ if (config.isProd) {
   if (!config.adminEmail) problems.push('ADMIN_EMAIL must be set so someone can approve tradies');
   if (problems.length) throw new Error('Not ready for production:\n  - ' + problems.join('\n  - '));
   if (!config.emailEnabled) console.warn('Warning: no email provider set (RESEND_API_KEY or POSTMARK_TOKEN). Emails will only be logged.');
+  if (!config.businessAbn) console.warn('Warning: BUSINESS_ABN is not set. Add it once your ABN comes through.');
   if (config.stripeSecretKey.startsWith('sk_test_')) console.warn('Warning: Stripe is in test mode. No real money will move.');
 }
 

@@ -16,6 +16,8 @@ The site is built. What's left is accounts, settings and getting the first tradi
 - Residential building work over $20,000 needs a registered building contractor, and usually home indemnity insurance.
 - Plumbers, gasfitters and electricians must be licensed for almost everything.
 
+Until you've had a lawyer look at bigger jobs, set `MAX_QUOTE_DOLLARS=20000`. The site will then turn away quotes over $20,000, and the $50,000+ budget option disappears.
+
 When you approve tradies, check their licence on the right register. Their job alerts only go to the trades they listed, so if you approve someone you're vouching for them.
 
 ## 2. Accounts to set up

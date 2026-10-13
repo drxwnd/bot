@@ -13,6 +13,7 @@ process.env.STRIPE_SECRET_KEY = '';
 process.env.ADMIN_EMAIL = 'boss@test.local';
 process.env.MIN_FEE_DOLLARS = '15';
 process.env.CUSTOMER_FEE_PERCENT = '2';
+process.env.MAX_QUOTE_DOLLARS = '20000';
 
 const app = require('../server');
 const db = require('../src/db');
@@ -130,6 +131,11 @@ test('job alerts, fees, contact details and reminders', async () => {
 
   // A small $200 quote: the $15 minimum applies, and the customer pays 2% on top.
   await tiler.b.get(`/jobs/${jobId}`);
+  // Quotes over the $20,000 cap are turned away.
+  await tiler.b.post(`/jobs/${jobId}/quotes`, { amount: '25000', message: 'Full bathroom and kitchen rebuild.' });
+  assert.strictEqual(one('SELECT COUNT(*) AS n FROM quotes WHERE job_id = ?', jobId).n, 0);
+  await tiler.b.get(`/jobs/${jobId}`);
+
   await tiler.b.post(`/jobs/${jobId}/quotes`, { amount: '200', message: 'Cut out and replace both tiles, regrout.' });
   const quote = one('SELECT * FROM quotes WHERE job_id = ?', jobId);
   let page = await tiler.b.get(`/jobs/${jobId}`);

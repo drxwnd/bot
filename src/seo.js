@@ -33,6 +33,8 @@ const organization = () => ({
   url: url('/'),
   logo: url('/img/icon-512.png'),
   email: config.supportEmail,
+  ...(config.legalName ? { legalName: config.legalName } : {}),
+  ...(config.businessAbn ? { taxID: config.businessAbn } : {}),
   areaServed: { '@type': 'State', name: 'Western Australia' },
   address: { '@type': 'PostalAddress', addressLocality: 'Perth', addressRegion: 'WA', addressCountry: 'AU' },
 });
