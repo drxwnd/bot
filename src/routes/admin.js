@@ -5,6 +5,8 @@ const notify = require('../notify');
 const { flash, requireRole } = require('../middleware');
 const { can } = require('../permissions');
 const config = require('../config');
+const QRCode = require('qrcode');
+const { feeFor, money, feeLabel } = require('../helpers');
 
 const router = express.Router();
 router.use(requireRole('admin'));
@@ -67,6 +69,30 @@ router.get('/', (req, res) => {
       ['Customer payment fee', config.customerFeePercent ? `${config.customerFeePercent}%` : 'Off', true],
       ['Visitor stats', config.plausibleDomain ? `Plausible (${config.plausibleDomain})` : 'Off', Boolean(config.plausibleDomain)],
     ],
+  });
+});
+
+// Printable A4 flyers with a QR code, for handing out to tradies and to property managers.
+// Open in a browser and print, or "Save as PDF".
+const FLYERS = {
+  tradies: { path: '/for-tradies', source: 'flyer-tradies' },
+  customers: { path: '/start', source: 'flyer-customers' },
+};
+
+router.get('/flyer/:who', async (req, res, next) => {
+  const flyer = FLYERS[req.params.who];
+  if (!flyer) return next();
+  const target = `${config.siteUrl}${flyer.path}?utm_source=${flyer.source}`;
+  const qr = await QRCode.toString(target, { type: 'svg', margin: 0, errorCorrectionLevel: 'M', color: { dark: '#1c1b18', light: '#0000' } });
+  res.locals.robots = 'noindex, nofollow';
+  res.render('pages/flyer', {
+    title: 'Flyer',
+    who: req.params.who,
+    qr,
+    shortUrl: config.siteUrl.replace(/^https?:\/\//, '') + flyer.path,
+    example: { quote: 150000, fee: feeFor(150000) },
+    money,
+    feeLabel,
   });
 });
 

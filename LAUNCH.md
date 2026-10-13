@@ -156,6 +156,7 @@ A marketplace makes money when a job gets three good quotes fast. Everything bel
 **All along:**
 - **Google:** set up a Google Business Profile, and submit `https://tradebench.au/sitemap.xml` in Search Console. The trade and area pages are built to rank for searches like "tiler Bayswater" over the following months.
 - **Reviews:** ask every happy customer for a review. The site emails them a link after they release payment.
+- **Scripts and flyers:** `docs/OUTREACH.md` has phone and email scripts. Print flyers from `/admin/flyer/tradies` and `/admin/flyer/customers`.
 - **Groups:** post in local Facebook community groups when you can honestly say "we've got tilers and plumbers free this week in [suburb]".
 - **Metrics:** watch the **Last 30 days** numbers in `/admin`. The ones that matter are quotes per job (aim for 3+), jobs with no quotes (aim for 0), and jobs paid.
 

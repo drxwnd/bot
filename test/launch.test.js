@@ -225,3 +225,17 @@ test('password reset and unsubscribe links', async () => {
   assert.match(res.text, /Job alerts are off/);
   assert.strictEqual(one('SELECT email_alerts FROM users WHERE id = ?', uid).email_alerts, 0);
 });
+
+test('printable flyers are admin only and carry a QR code', async () => {
+  const admin = browser();
+  await admin.get('/login');
+  await admin.post('/login', { email: 'boss@test.local', password: 'longpassword' });
+  let res = await admin.get('/admin/flyer/tradies');
+  assert.strictEqual(res.status, 200);
+  assert.match(res.text, /<svg[^>]*viewBox/);
+  assert.match(res.text, /Get paid before you start/);
+  res = await admin.get('/admin/flyer/customers');
+  assert.match(res.text, /Scan to post your first job/);
+  res = await browser().get('/admin/flyer/tradies');
+  assert.notStrictEqual(res.status, 200);
+});

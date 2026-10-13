@@ -2,7 +2,11 @@
 <div class="wrap page">
   <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
     <h1 style="margin:0">Admin</h1>
-    <% if (can('team')) { %><a class="btn ghost small" href="/team">Tradebench staff</a><% } else { %><span class="tag">Support access</span><% } %>
+    <div class="actions">
+      <a class="btn ghost small" href="/admin/flyer/tradies">Tradie flyer</a>
+      <a class="btn ghost small" href="/admin/flyer/customers">Customer flyer</a>
+      <% if (can('team')) { %><a class="btn ghost small" href="/team">Tradebench staff</a><% } else { %><span class="tag">Support access</span><% } %>
+    </div>
   </div>
 
   <div class="stats" style="margin-top:24px">

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= who === 'tradies' ? 'Tradie flyer' : 'Customer flyer' %> | <%= siteName %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/flyer.css">
+</head>
+<body>
+  <p class="screen-only">Print this page on A4 (or choose "Save as PDF"). Turn on "Background graphics" so the photo prints. <a href="/admin/flyer/<%= who === 'tradies' ? 'customers' : 'tradies' %>">Switch to the <%= who === 'tradies' ? 'customer' : 'tradie' %> flyer</a></p>
+
+  <main class="sheet">
+    <header class="band">
+      <img src="/img/photos/<%= PHOTOS[who === 'tradies' ? 'headTradies' : 'headHotels'].file %>" alt="">
+      <div class="band-inner">
+        <div class="logo"><%- include('../partials/mark') %>tradebench</div>
+        <% if (who === 'tradies') { %>
+          <p class="kicker">For Perth and WA tradies</p>
+          <h1>Get paid before you start. No lead fees.</h1>
+        <% } else { %>
+          <p class="kicker">For property managers, hotels and site managers</p>
+          <h1>Quotes from checked local tradies. Pay when it's done.</h1>
+        <% } %>
+      </div>
+    </header>
+
+    <section class="body">
+      <% if (who === 'tradies') { %>
+        <p class="lede">Tradebench is a new Perth marketplace for repair, maintenance and building jobs from homes, hotels and mine sites. Customers post the job, you send a fixed price, and the money is locked in before you lift a tool.</p>
+        <ul class="points">
+          <li><strong>Free to join and quote.</strong> No subscription, no paying for leads you don't win.</li>
+          <li><strong>The customer pays up front.</strong> We hold it, you see it's there, then do the job.</li>
+          <li><strong><%= feeLabel %> only when you're paid.</strong> Taken out of the payout. Nothing else.</li>
+          <li><strong>Jobs come to you.</strong> We email you new jobs in your trade and your areas.</li>
+        </ul>
+        <table class="sum">
+          <tr><td>Your quote</td><td><%= money(example.quote) %></td></tr>
+          <tr><td>Our fee</td><td>&minus;<%= money(example.fee) %></td></tr>
+          <tr class="total"><td>Paid to your bank</td><td><%= money(example.quote - example.fee) %></td></tr>
+        </table>
+      <% } else { %>
+        <p class="lede">Post a repair or maintenance job once and get fixed prices from local tradies whose ABN, licence and insurance we've checked. Your payment is held until you sign the job off.</p>
+        <ul class="points">
+          <li><strong>Free to post.</strong> Quotes are free and you don't have to accept any.</li>
+          <li><strong>Checked tradies.</strong> ABN, licence and public liability insurance checked before they can quote.</li>
+          <li><strong>Money held until it's done.</strong> The tradie only gets paid when you say the job's finished.</li>
+          <li><strong>Built for property teams.</strong> One account for every property, logins for your staff, and every job and invoice in one place.</li>
+        </ul>
+        <p class="good-for">Good for: leaking taps, hot water, air con, cracked tiles, painting between tenants, locks, gutters, fencing, room refurbishments, camp maintenance.</p>
+      <% } %>
+    </section>
+
+    <section class="cta">
+      <div class="qr"><%- qr %></div>
+      <div>
+        <h2><%= who === 'tradies' ? 'Scan to join. It takes about 10 minutes.' : 'Scan to post your first job.' %></h2>
+        <p class="url"><%= shortUrl %></p>
+        <% if (who === 'tradies') { %>
+          <p class="need">Have these ready: your ABN, your licence number if your trade needs one, and your public liability insurer and expiry date.</p>
+        <% } else { %>
+          <p class="need">Takes two minutes. Only the suburb is shown publicly, and only the tradie you choose gets your details.</p>
+        <% } %>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span>Started by a Perth family with a tiler in it.</span>
+      <span><%= supportEmail %><% if (businessAbn) { %> · ABN <%= businessAbn %><% } %></span>
+    </footer>
+  </main>
+</body>
+</html>
