@@ -1,0 +1,9 @@
+node_modules
+data
+uploads
+demo-data
+.env
+*.db
+*.db-*
+.git
+test

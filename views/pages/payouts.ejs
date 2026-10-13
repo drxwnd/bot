@@ -9,7 +9,7 @@
       <p class="small muted" style="margin:0">Online payouts aren't switched on yet. We'll email you as soon as they are.</p>
     <% } else if (ready) { %>
       <h3><span class="tag released">Set up</span>&nbsp; Payouts are on</h3>
-      <p class="small muted">When a customer signs off a job, the money minus <%= feePercent %>% goes to your Stripe account and then to your bank, usually within 2 business days.</p>
+      <p class="small muted">When a customer signs off a job, the money minus <%= feeLabel %> goes to your Stripe account and then to your bank, usually within 2 business days.</p>
       <% if (!simulated) { %>
         <form method="post" action="/dashboard/payouts/stripe">
           <input type="hidden" name="_csrf" value="<%= csrf %>">

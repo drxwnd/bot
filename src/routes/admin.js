@@ -1,8 +1,10 @@
 const express = require('express');
 const db = require('../db');
 const payments = require('../payments');
+const notify = require('../notify');
 const { flash, requireRole } = require('../middleware');
 const { can } = require('../permissions');
+const config = require('../config');
 
 const router = express.Router();
 router.use(requireRole('admin'));
@@ -23,14 +25,26 @@ const q = {
     WHERE p.status != 'pending' ORDER BY p.created_at DESC LIMIT 200`),
   totals: db.prepare(`
     SELECT
-      COALESCE(SUM(CASE WHEN status = 'released' THEN fee_cents END), 0) AS fees_earned,
-      COALESCE(SUM(CASE WHEN status = 'held' THEN amount_cents END), 0) AS held,
+      COALESCE(SUM(CASE WHEN status = 'released' THEN fee_cents + customer_fee_cents END), 0) AS fees_earned,
+      COALESCE(SUM(CASE WHEN status = 'held' THEN amount_cents + customer_fee_cents END), 0) AS held,
       COALESCE(SUM(CASE WHEN status = 'released' THEN amount_cents END), 0) AS volume
     FROM payments`),
   setStatus: db.prepare(`
     UPDATE tradie_profiles SET status = ?, approved_at = CASE WHEN ? = 'approved' THEN datetime('now') ELSE approved_at END
     WHERE user_id = ?`),
   payment: db.prepare('SELECT * FROM payments WHERE id = ?'),
+  emails: db.prepare('SELECT id, to_email, kind, subject, status, error, created_at FROM emails ORDER BY id DESC LIMIT 40'),
+  health: db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM jobs WHERE created_at > datetime('now', '-30 days')) AS jobs_30d,
+      (SELECT COUNT(*) FROM jobs j WHERE status = 'open'
+        AND NOT EXISTS (SELECT 1 FROM quotes WHERE job_id = j.id AND status != 'withdrawn')) AS open_no_quotes,
+      (SELECT ROUND(AVG(n), 1) FROM (SELECT COUNT(q.id) AS n FROM jobs j LEFT JOIN quotes q ON q.job_id = j.id AND q.status != 'withdrawn'
+        WHERE j.created_at > datetime('now', '-30 days') GROUP BY j.id)) AS quotes_per_job,
+      (SELECT COUNT(*) FROM payments WHERE status IN ('held', 'released') AND paid_at > datetime('now', '-30 days')) AS paid_30d,
+      (SELECT COUNT(*) FROM tradie_profiles WHERE status = 'approved') AS tradies_live,
+      (SELECT COUNT(*) FROM tradie_profiles WHERE status = 'approved' AND payouts_enabled = 1) AS tradies_payouts,
+      (SELECT COUNT(*) FROM payments WHERE disputed = 1) AS disputes`),
   tradieForPayment: db.prepare(`
     SELECT tp.* FROM payments p JOIN quotes q ON q.id = p.quote_id
     JOIN tradie_profiles tp ON tp.user_id = q.tradie_id WHERE p.id = ?`),
@@ -43,14 +57,25 @@ router.get('/', (req, res) => {
     jobs: q.jobs.all(),
     payments: q.payments.all(),
     totals: q.totals.get(),
+    health: q.health.get(),
+    emails: q.emails.all(),
+    setup: [
+      ['Card payments', config.stripeSecretKey ? (config.stripeSecretKey.startsWith('sk_live_') ? 'Live' : 'Test mode, no real money') : 'Not set up (simulated)', config.stripeSecretKey.startsWith('sk_live_')],
+      ['Stripe webhook', config.stripeWebhookSecret ? 'Set' : 'Not set', Boolean(config.stripeWebhookSecret)],
+      ['Email', config.resendApiKey ? 'Resend' : config.postmarkToken ? 'Postmark' : 'Not set up, emails are only logged below', config.emailEnabled],
+      ['Tradie fee', `${config.feePercent}%${config.minFeeCents ? `, minimum $${config.minFeeCents / 100}` : ', no minimum'}`, true],
+      ['Customer payment fee', config.customerFeePercent ? `${config.customerFeePercent}%` : 'Off', true],
+      ['Visitor stats', config.plausibleDomain ? `Plausible (${config.plausibleDomain})` : 'Off', Boolean(config.plausibleDomain)],
+    ],
   });
 });
 
 router.post('/tradies/:id/:action', (req, res, next) => {
   if (!['approve', 'reject'].includes(req.params.action)) return next();
   const status = req.params.action === 'approve' ? 'approved' : 'rejected';
-  q.setStatus.run(status, status, Number(req.params.id));
-  flash(req, 'success', `Tradie ${status}.`);
+  const id = Number(req.params.id);
+  if (q.setStatus.run(status, status, id).changes) notify.tradieReviewed(id, status);
+  flash(req, 'success', `Tradie ${status}. We've emailed them.`);
   res.redirect('/admin#tradies');
 });
 
@@ -62,6 +87,10 @@ router.post('/payments/:id/:action', async (req, res, next) => {
   }
   const payment = q.payment.get(Number(req.params.id));
   if (!payment) return res.redirect('/admin');
+  if (req.params.action === 'release' && payment.disputed) {
+    flash(req, 'error', 'This payment is under a card dispute. Sort it out in Stripe before releasing.');
+    return res.redirect('/admin#payments');
+  }
   try {
     if (req.params.action === 'release') await payments.release(payment, q.tradieForPayment.get(payment.id));
     else await payments.refund(payment);

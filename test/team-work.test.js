@@ -124,7 +124,13 @@ test('tradie business: owner, worker and job management', async () => {
   await customer.get(`/jobs/${jobId}`);
   await customer.post(`/quotes/${quoteId}/accept`);
 
-  // The won job shows up in Work automatically.
+  // Not in Work until it's paid: the work order carries the customer's contact details.
+  res = await owner.get('/work');
+  assert.doesNotMatch(res.text, /Regrout shower/);
+  await customer.get(`/jobs/${jobId}`);
+  await customer.post(`/jobs/${jobId}/pay`);
+
+  // The won job shows up in Work automatically once paid.
   res = await owner.get('/work');
   assert.match(res.text, /Regrout shower/);
   const work = id('SELECT * FROM work_orders WHERE job_id = ?', jobId);

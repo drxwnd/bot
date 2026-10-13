@@ -12,6 +12,28 @@
     <div><span>Tradies waiting</span><b><%= tradies.filter(t => t.status === 'pending').length %></b></div>
   </div>
 
+  <div class="split" style="margin:8px 0 48px;gap:40px">
+    <div>
+      <h2 style="font-size:1.2rem">Last 30 days</h2>
+      <dl class="kv">
+        <dt>Jobs posted</dt><dd><%= health.jobs_30d %></dd>
+        <dt>Quotes per job</dt><dd><%= health.quotes_per_job ?? 0 %> <span class="small muted">(aim for 3+)</span></dd>
+        <dt>Jobs paid</dt><dd><%= health.paid_30d %></dd>
+        <dt>Open jobs with no quotes</dt><dd><%= health.open_no_quotes %><% if (health.open_no_quotes) { %> <span class="small muted">ring a tradie</span><% } %></dd>
+        <dt>Live tradies</dt><dd><%= health.tradies_live %> <span class="small muted">(<%= health.tradies_payouts %> with payouts on)</span></dd>
+        <% if (health.disputes) { %><dt>Card disputes</dt><dd style="color:var(--bad)"><%= health.disputes %> open</dd><% } %>
+      </dl>
+    </div>
+    <div>
+      <h2 style="font-size:1.2rem">Set-up</h2>
+      <dl class="kv">
+        <% setup.forEach(([label, value, good]) => { %>
+          <dt><%= label %></dt><dd><span style="color:<%= good ? 'var(--ok)' : 'var(--warn)' %>">●</span> <%= value %></dd>
+        <% }) %>
+      </dl>
+    </div>
+  </div>
+
   <h2 id="tradies" style="font-size:1.4rem">Tradies</h2>
   <div class="table-wrap" style="margin-bottom:48px">
     <table>
@@ -58,7 +80,7 @@
               <% if (p.status === 'held' && can('money')) { %>
                 <div class="actions">
                   <form method="post" action="/admin/payments/<%= p.id %>/release" data-confirm="Release <%= money(p.amount_cents - p.fee_cents) %> to <%= p.business_name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn small">Release</button></form>
-                  <form method="post" action="/admin/payments/<%= p.id %>/refund" data-confirm="Refund <%= money(p.amount_cents) %> to the customer and cancel the job?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ghost small">Refund</button></form>
+                  <form method="post" action="/admin/payments/<%= p.id %>/refund" data-confirm="Refund <%= money(p.amount_cents + p.customer_fee_cents) %> to the customer and cancel the job?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ghost small">Refund</button></form>
                 </div>
               <% } %>
             </td>
@@ -82,6 +104,24 @@
             <td class="num"><%= j.quote_count %></td>
             <td><span class="tag <%= j.status %>"><%= STATUS_LABEL[j.status] %></span></td>
             <td class="muted"><%= ago(j.created_at) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="emails" style="font-size:1.4rem">Recent emails</h2>
+  <div class="table-wrap" style="margin-bottom:48px">
+    <table>
+      <thead><tr><th>When</th><th>To</th><th>What</th><th>Status</th></tr></thead>
+      <tbody>
+        <% if (!emails.length) { %><tr><td colspan="4" class="muted">Nothing sent yet.</td></tr><% } %>
+        <% emails.forEach(e => { %>
+          <tr>
+            <td class="small"><%= ago(e.created_at) %></td>
+            <td class="small"><%= e.to_email %></td>
+            <td class="small"><%= e.subject %></td>
+            <td><span class="tag <%= e.status === 'failed' ? 'rejected' : e.status === 'sent' ? 'approved' : 'pending' %>"><%= e.status %></span><% if (e.error) { %><br><span class="small muted"><%= e.error.slice(0, 120) %></span><% } %></td>
           </tr>
         <% }) %>
       </tbody>

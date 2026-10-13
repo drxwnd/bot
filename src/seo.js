@@ -3,7 +3,7 @@ const config = require('./config');
 const url = (path) => config.siteUrl + path;
 
 // Pages that shouldn't show up in search results.
-const PRIVATE_PATHS = [/^\/login/, /^\/signup/, /^\/logout/, /^\/dashboard/, /^\/admin/, /^\/jobs\/new/, /^\/quotes\//, /^\/stripe\//, /^\/team/, /^\/invite\//, /^\/work/, /^\/invoices/];
+const PRIVATE_PATHS = [/^\/login/, /^\/signup/, /^\/logout/, /^\/dashboard/, /^\/admin/, /^\/jobs\/new/, /^\/quotes\//, /^\/stripe\//, /^\/team/, /^\/invite\//, /^\/work/, /^\/invoices/, /^\/forgot/, /^\/reset\//, /^\/unsubscribe/];
 
 function seoDefaults(req, res, next) {
   const isPrivate = PRIVATE_PATHS.some((re) => re.test(req.path));

@@ -8,6 +8,7 @@ const db = require('../db');
 const config = require('../config');
 const C = require('../constants');
 const payments = require('../payments');
+const notify = require('../notify');
 const { parseDollars } = require('../helpers');
 const seo = require('../seo');
 const { locate, errorMessage } = require('../locality');
@@ -206,7 +207,8 @@ router.post(
       return jobId;
     })();
 
-    flash(req, 'success', "Your job is live. We'll show quotes here as they come in.");
+    notify.jobPosted(id);
+    flash(req, 'success', "Your job is live. We'll email you as quotes come in.");
     res.redirect(`/jobs/${id}`);
   },
 );
@@ -273,6 +275,8 @@ router.get('/jobs/:id', loadJob, (req, res) => {
     canAccept: Boolean(isOwner && allowed(req, 'accept')),
     canPay: Boolean(isOwner && allowed(req, 'pay')),
     isAwardedTradie,
+    // Contact details are swapped only once the money is held, so the job stays on the platform.
+    contactsVisible: job.status === 'paid' || job.status === 'completed',
     payment: payments.paymentForJob(job.id),
     review: q.review.get(job.id),
     paymentsAvailable: payments.available,
@@ -313,7 +317,8 @@ router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requ
     flash(req, 'error', "Add a short note about what's included so the customer can compare quotes.");
   } else {
     q.insertQuote.run(job.id, req.account.ownerId, amount, message, start);
-    flash(req, 'success', 'Quote sent. The customer will see it on their job page.');
+    notify.quoteReceived(q.myQuote.get(job.id, req.account.ownerId).id);
+    flash(req, 'success', "Quote sent. We've emailed the customer, and we'll email you if they accept.");
   }
   res.redirect(`/jobs/${job.id}#quote`);
 });
@@ -347,6 +352,7 @@ router.post('/quotes/:id/accept', requireLogin, (req, res, next) => {
     q.acceptQuote.run(quote.id);
     q.declineOthers.run(job.id, quote.id);
   })();
+  notify.quoteAccepted(quote.id);
   flash(req, 'success', 'Quote accepted. Pay now to lock it in. We hold the money until you confirm the job is done.');
   res.redirect(`/jobs/${job.id}#payment`);
 });
@@ -377,6 +383,10 @@ router.post('/jobs/:id/release', requireLogin, loadJob, ownsJob, requireJobActio
   const job = req.job;
   const payment = payments.paymentForJob(job.id);
   if (!payment || payment.status !== 'held') return res.redirect(`/jobs/${job.id}`);
+  if (payment.disputed) {
+    flash(req, 'error', `This payment is under a card dispute, so it can't be released yet. Email ${config.supportEmail} and we'll help.`);
+    return res.redirect(`/jobs/${job.id}`);
+  }
 
   const quote = q.quote.get(job.accepted_quote_id);
   const profile = q.profile.get(quote.tradie_id);

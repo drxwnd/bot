@@ -15,9 +15,22 @@ function parseDollars(input) {
   return cents > 0 && cents <= 100_000_000 ? cents : null;
 }
 
+// Our fee on a job, taken from the tradie's payout: a percentage, with an optional minimum.
+// Never more than half the job, so a tiny job can't end up mostly fee.
 function feeFor(cents) {
-  return Math.round((cents * config.feePercent) / 100);
+  const pct = Math.round((cents * config.feePercent) / 100);
+  return Math.min(Math.max(pct, config.minFeeCents), Math.floor(cents / 2));
 }
+
+// Optional "secure payment fee" the customer pays on top at checkout. 0 unless switched on.
+function customerFeeFor(cents) {
+  return Math.round((cents * config.customerFeePercent) / 100);
+}
+
+// How the tradie fee is described in copy: "4%" or "4% (minimum $15)".
+const feeLabel = config.minFeeCents
+  ? `${config.feePercent}% (minimum ${money(config.minFeeCents).replace(/\.00$/, '')})`
+  : `${config.feePercent}%`;
 
 // SQLite stores UTC as "YYYY-MM-DD HH:MM:SS".
 function toDate(s) {
@@ -77,11 +90,13 @@ module.exports = {
   money,
   parseDollars,
   feeFor,
+  customerFeeFor,
+  feeLabel,
   ago,
   shortDate,
   formatAbn,
   validAbn,
   list,
   STATUS_LABEL,
-  locals: { money, feeFor, ago, shortDate, formatAbn, STATUS_LABEL, ...C },
+  locals: { money, feeFor, customerFeeFor, feeLabel, customerFeePercent: config.customerFeePercent, ago, shortDate, formatAbn, STATUS_LABEL, ...C },
 };

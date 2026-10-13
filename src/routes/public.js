@@ -3,6 +3,7 @@ const db = require('../db');
 const C = require('../constants');
 const seo = require('../seo');
 const config = require('../config');
+const { feeLabel } = require('../helpers');
 
 const router = express.Router();
 
@@ -72,7 +73,7 @@ router.get('/how-it-works', (req, res) => {
 router.get('/for-tradies', (req, res) => {
   res.render('pages/tradies', {
     title: 'Find work as a tradie in WA, no lead fees',
-    description: `Free for tradies to join and quote on jobs across WA. No lead fees. We take ${config.feePercent}% only when you win the job and get paid.`,
+    description: `Free for tradies to join and quote on jobs across WA. No lead fees. We take ${feeLabel} only when you win the job and get paid.`,
     jsonld: [seo.faqPage(TRADIE_FAQS)],
     faqs: TRADIE_FAQS,
   });
@@ -140,7 +141,7 @@ router.get('/tradies/:id', (req, res, next) => {
 const TRADIE_FAQS = [
   ["What if the customer won't sign off a finished job?", "Email us with the job number. We'll talk to both of you, look at photos of the finished work, and release the payment if it was done as quoted."],
   ['What if the job turns out bigger than the quote?', "Talk to the customer first. Extra work can go up as a separate job so it's paid and held the same way."],
-  [`Is the ${config.feePercent}% plus GST?`, `No. It's ${config.feePercent}% of the quote, all in, taken out before the payout.`],
+  [`Is the ${config.feePercent}% plus GST?`, `No. It's ${feeLabel} of the quote, all in, taken out before the payout.`],
   ['Can I deal with the customer directly next time?', "For 12 months after we introduce you, please keep jobs with that customer on the site. That's what lets us skip charging for leads."],
 ];
 

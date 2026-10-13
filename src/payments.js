@@ -8,7 +8,8 @@
 
 const config = require('./config');
 const db = require('./db');
-const { feeFor } = require('./helpers');
+const { feeFor, customerFeeFor } = require('./helpers');
+const notify = require('./notify');
 
 const stripe = config.paymentsEnabled ? require('stripe')(config.stripeSecretKey) : null;
 const simulated = !stripe && !config.isProd;
@@ -17,7 +18,7 @@ const q = {
   paymentForJob: db.prepare('SELECT * FROM payments WHERE job_id = ?'),
   paymentById: db.prepare('SELECT * FROM payments WHERE id = ?'),
   insertPayment: db.prepare(
-    'INSERT INTO payments (job_id, quote_id, amount_cents, fee_cents) VALUES (?, ?, ?, ?)',
+    'INSERT INTO payments (job_id, quote_id, amount_cents, fee_cents, customer_fee_cents) VALUES (?, ?, ?, ?, ?)',
   ),
   setSession: db.prepare('UPDATE payments SET stripe_session_id = ? WHERE id = ?'),
   markHeld: db.prepare(`
@@ -90,7 +91,9 @@ async function payoutDashboardLink(profile) {
 async function startCheckout(job, quote, customer) {
   let payment = q.paymentForJob.get(job.id);
   if (!payment) {
-    const info = q.insertPayment.run(job.id, quote.id, quote.amount_cents, feeFor(quote.amount_cents));
+    const info = q.insertPayment.run(
+      job.id, quote.id, quote.amount_cents, feeFor(quote.amount_cents), customerFeeFor(quote.amount_cents),
+    );
     payment = q.paymentById.get(info.lastInsertRowid);
   }
   if (payment.status !== 'pending') throw new Error('This job has already been paid');
@@ -113,6 +116,16 @@ async function startCheckout(job, quote, customer) {
           product_data: { name: `Job #${job.id}: ${job.title}`.slice(0, 250) },
         },
       },
+      ...(payment.customer_fee_cents
+        ? [{
+            quantity: 1,
+            price_data: {
+              currency: 'aud',
+              unit_amount: payment.customer_fee_cents,
+              product_data: { name: 'Secure payment fee', description: 'Card processing, and holding your money until the job is done' },
+            },
+          }]
+        : []),
     ],
     payment_intent_data: {
       transfer_group: `job_${job.id}`,
@@ -130,7 +143,10 @@ function markHeld(paymentId, paymentIntent, chargeId) {
   const payment = q.paymentById.get(paymentId);
   if (!payment) return false;
   const changed = q.markHeld.run(paymentIntent, chargeId, paymentId).changes > 0;
-  if (changed) q.jobPaid.run(payment.job_id);
+  if (changed) {
+    q.jobPaid.run(payment.job_id);
+    notify.paymentHeld(payment.job_id);
+  }
   return changed;
 }
 
@@ -155,6 +171,7 @@ async function confirmCheckoutSession(sessionOrId) {
 
 async function release(payment, tradieProfile) {
   if (payment.status !== 'held') throw new Error('Nothing to release');
+  if (payment.disputed) throw new Error('This payment is under a card dispute and cannot be released until that is resolved');
   const payout = payment.amount_cents - payment.fee_cents;
   let transferId = 'tr_simulated';
 
@@ -174,8 +191,10 @@ async function release(payment, tradieProfile) {
     transferId = transfer.id;
   }
 
-  q.markReleased.run(transferId, payment.id);
-  q.jobCompleted.run(payment.job_id);
+  if (q.markReleased.run(transferId, payment.id).changes) {
+    q.jobCompleted.run(payment.job_id);
+    notify.paymentReleased(payment.job_id);
+  }
 }
 
 async function refund(payment) {
@@ -186,8 +205,40 @@ async function refund(payment) {
       { idempotencyKey: `refund-${payment.id}` },
     );
   }
-  q.markRefunded.run(payment.id);
-  q.jobCancelled.run(payment.job_id);
+  if (q.markRefunded.run(payment.id).changes) {
+    q.jobCancelled.run(payment.job_id);
+    notify.refunded(payment.job_id);
+  }
+}
+
+// ---- Things that happen in Stripe rather than on our site ----
+
+const byCharge = db.prepare('SELECT * FROM payments WHERE stripe_charge_id = ? OR stripe_payment_intent = ?');
+
+function paymentForStripe(chargeId, paymentIntent) {
+  return byCharge.get(chargeId || '', paymentIntent || '') || null;
+}
+
+function disputeOpened(dispute) {
+  const payment = paymentForStripe(dispute.charge, dispute.payment_intent);
+  if (!payment) return;
+  db.prepare('UPDATE payments SET disputed = 1 WHERE id = ?').run(payment.id);
+  notify.disputeOpened(payment.job_id);
+}
+
+function disputeClosed(dispute) {
+  const payment = paymentForStripe(dispute.charge, dispute.payment_intent);
+  if (payment && dispute.status === 'won') db.prepare('UPDATE payments SET disputed = 0 WHERE id = ?').run(payment.id);
+}
+
+// A refund made straight from the Stripe dashboard instead of our admin page.
+function refundedInStripe(charge) {
+  if (!charge.refunded) return;
+  const payment = paymentForStripe(charge.id, charge.payment_intent);
+  if (payment && q.markRefunded.run(payment.id).changes) {
+    q.jobCancelled.run(payment.job_id);
+    notify.refunded(payment.job_id);
+  }
 }
 
 function constructWebhookEvent(rawBody, signature) {
@@ -206,5 +257,8 @@ module.exports = {
   release,
   refund,
   constructWebhookEvent,
+  disputeOpened,
+  disputeClosed,
+  refundedInStripe,
   paymentForJob: (jobId) => q.paymentForJob.get(jobId),
 };

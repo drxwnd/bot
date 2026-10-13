@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const C = require('../constants');
 const payments = require('../payments');
+const notify = require('../notify');
 const { validAbn, list } = require('../helpers');
 const { flash, requireLogin, requireRole, requireCan } = require('../middleware');
 const { can } = require('../permissions');
@@ -118,6 +119,7 @@ router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), 
   if (error) return res.status(400).render('pages/profile-edit', { title: 'Business details', values, error });
 
   req.session.intent = null;
+  const before = req.user.profile;
   db.transaction(() => {
     q.updateUser.run(values.name, values.phone || null, req.account.ownerId);
     q.upsertProfile.run({
@@ -127,11 +129,12 @@ router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), 
       regions: values.regions.join(','),
     });
   })();
+  if (!before || before.status !== 'approved') notify.tradieSubmitted(req.account.ownerId);
 
   flash(
     req,
     'success',
-    req.user.profile && req.user.profile.status === 'approved'
+    before && before.status === 'approved'
       ? 'Details saved.'
       : "Thanks. We'll check your ABN, licence and insurance, usually within one business day.",
   );

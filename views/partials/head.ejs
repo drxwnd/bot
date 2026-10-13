@@ -49,6 +49,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <% if (plausibleDomain) { %><script defer data-domain="<%= plausibleDomain %>" src="https://plausible.io/js/script.js"></script><% } %>
   <% if (typeof quizStep !== 'undefined') { %>
   <meta name="quiz-step" content="<%= quizStep %>">
   <link rel="stylesheet" href="/css/quiz.css">

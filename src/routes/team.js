@@ -9,6 +9,7 @@ const db = require('../db');
 const config = require('../config');
 const { TEAM_ROLES, ROLE_NAMES } = require('../permissions');
 const { flash, requireCan } = require('../middleware');
+const notify = require('../notify');
 
 const router = express.Router();
 
@@ -68,6 +69,7 @@ router.post('/team/invite', requireCan('team'), (req, res) => {
 
   const token = crypto.randomBytes(18).toString('base64url');
   q.insert.run(req.account.ownerId, email, name, role, token);
+  notify.teamInvite({ email, name }, businessName(req.account.owner), inviteUrl(token));
   req.session.newInvite = { name, token };
   res.redirect('/team');
 });

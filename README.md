@@ -31,22 +31,19 @@ Uses Stripe Connect (Express accounts) with separate charges and transfers:
 3. The customer clicks **release**. The quote amount minus 4% is transferred to the tradie, and the 4% stays in your account.
 4. Admins can release or refund held payments from `/admin`.
 
-Stripe's card fee (about 1.7% + 30c for Australian cards) comes out of the platform's share, so you keep about 2.3% on a typical job.
+Stripe's fees come out of the platform's share. `MIN_FEE_DOLLARS` and `CUSTOMER_FEE_PERCENT` let you set a minimum fee per job and a small customer-side payment fee. See [LAUNCH.md](LAUNCH.md) for the numbers.
 
-Before going live, set up Stripe:
+Customer and tradie contact details are only shown to each other once the job is paid, so work stays on the platform.
 
-1. Turn on **Connect**, choosing Express accounts with the platform in Australia.
-2. Add the webhook endpoint described in `.env.example`.
-3. Swap the test keys for live keys.
+## Emails and reminders
+
+`src/notify.js` decides who gets told what. Templates are in `src/emails.js`, and sending (Resend or Postmark) is in `src/mailer.js`. Every email is logged in the `emails` table and shown in `/admin`. Without a provider key, emails are logged but not sent.
+
+`src/reminders.js` runs hourly and nudges people when things stall: quotes waiting, payments held, unfinished sign-ups, missing payouts. `src/backup.js` copies the database daily.
 
 ## Deploying
 
-Any host that runs Node 20+ with a persistent disk works (Render, Railway, Fly.io or a small VPS).
-
-1. Set the variables from `.env.example`.
-2. Point `DATA_DIR` and `UPLOAD_DIR` at the persistent disk.
-3. Run `npm install`, then `npm start`.
-4. Point your domain at the host.
+**[LAUNCH.md](LAUNCH.md) has the full step-by-step**, including Stripe, email, domain and Fly.io. The short version: the repo has a `Dockerfile` and `fly.toml`. Create the volume, set the secrets from `.env.example`, and run `fly deploy`. The app refuses to start in production if a required setting is missing, and `/healthz` reports whether it's up.
 
 ## Job locations
 

@@ -11,6 +11,8 @@ const { loadSession, verifyCsrf } = require('./src/middleware');
 const seo = require('./src/seo');
 const { TRADE_INFO, REGION_INFO } = require('./src/seo-content');
 const { PHOTOS } = require('./src/photos');
+const db = require('./src/db');
+const mailer = require('./src/mailer');
 
 const app = express();
 
@@ -24,10 +26,21 @@ Object.assign(app.locals, locals, {
   TRADE_INFO,
   REGION_INFO,
   PHOTOS,
+  plausibleDomain: config.plausibleDomain,
   jsonForScript: seo.jsonForScript,
 });
 
 app.use(compression());
+
+// For the host's health checks. Checks the database is answering, not just that Node is up.
+app.get('/healthz', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.type('text').send('ok');
+  } catch (err) {
+    res.status(503).type('text').send('database unavailable');
+  }
+});
 
 // Send old or alternate hostnames (www., the .com.au) to the main one so Google sees one site.
 const redirectHosts = (process.env.REDIRECT_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
@@ -45,6 +58,8 @@ app.use(
         'style-src-attr': ["'unsafe-inline'"],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'img-src': ["'self'", 'data:'],
+        'script-src': ["'self'", ...(config.plausibleDomain ? ['https://plausible.io'] : [])],
+        'connect-src': ["'self'", ...(config.plausibleDomain ? ['https://plausible.io'] : [])],
         'form-action': ["'self'", 'https://checkout.stripe.com', 'https://connect.stripe.com'],
         'upgrade-insecure-requests': config.isProd ? [] : null,
       },
@@ -105,9 +120,24 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     console.log(`${config.siteName} running at ${config.siteUrl}`);
   });
+  require('./src/reminders').start();
+  require('./src/backup').start();
+
+  // Deploys send SIGTERM. Finish requests in flight and any emails being sent, then close the database cleanly.
+  const shutdown = (signal) => {
+    console.log(`${signal} received, shutting down`);
+    server.close(async () => {
+      await mailer.flush();
+      db.close();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 module.exports = app;

@@ -216,4 +216,47 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 );
 `);
 
+// Notifications.
+addColumn('users', 'email_alerts', 'INTEGER NOT NULL DEFAULT 1');
+addColumn('payments', 'customer_fee_cents', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('payments', 'disputed', 'INTEGER NOT NULL DEFAULT 0');
+
+db.exec(`
+-- Every email we send (or would have sent, without a provider). Kept for support and debugging.
+CREATE TABLE IF NOT EXISTS emails (
+  id         INTEGER PRIMARY KEY,
+  to_email   TEXT NOT NULL,
+  kind       TEXT NOT NULL,
+  subject    TEXT NOT NULL,
+  body_text  TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'sent', 'logged', 'failed')),
+  error      TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  sent_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS emails_created ON emails(created_at);
+
+-- One-off reminders that have already gone out, so the hourly check never repeats one.
+CREATE TABLE IF NOT EXISTS reminders_sent (
+  kind    TEXT NOT NULL,
+  ref_id  INTEGER NOT NULL,
+  sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (kind, ref_id)
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  used_at    TEXT
+);
+
+-- Stripe can send the same event more than once.
+CREATE TABLE IF NOT EXISTS stripe_events (
+  id          TEXT PRIMARY KEY,
+  type        TEXT NOT NULL,
+  received_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`);
+
 module.exports = db;

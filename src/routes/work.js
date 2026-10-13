@@ -80,7 +80,8 @@ const hoursText = (minutes) => {
 // ---- Queries ----
 
 const q = {
-  // Every job a business has won on Tradebench gets a work order the first time they look.
+  // Every job a business has won on Tradebench gets a work order the first time they look after
+  // it's paid. Not before: the customer's contact details come with it.
   syncWon: db.prepare(`
     INSERT INTO work_orders (account_id, source, job_id, title, client_name, client_phone, client_email, address,
       description, price_cents, status, created_at)
@@ -89,7 +90,7 @@ const q = {
       u.phone, u.email, COALESCE(j.address, j.suburb || ' WA ' || j.postcode), j.description, qt.amount_cents,
       CASE WHEN j.status = 'completed' THEN 'done' ELSE 'new' END, j.created_at
     FROM jobs j JOIN quotes qt ON qt.id = j.accepted_quote_id JOIN users u ON u.id = j.customer_id
-    WHERE qt.tradie_id = ? AND j.status IN ('awarded', 'paid', 'completed')
+    WHERE qt.tradie_id = ? AND j.status IN ('paid', 'completed')
       AND NOT EXISTS (SELECT 1 FROM work_orders w WHERE w.job_id = j.id)`),
   syncCancelled: db.prepare(`
     UPDATE work_orders SET status = 'cancelled'

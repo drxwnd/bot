@@ -1,0 +1,21 @@
+<%- include('../partials/head') %>
+<div class="auth">
+  <h1>Reset your password</h1>
+  <% if (typeof sent !== 'undefined' && sent) { %>
+    <div class="notice success">If there's an account for <strong><%= email %></strong>, we've emailed it a link to choose a new password. It works for one hour. Check your junk folder if it hasn't arrived in a few minutes.</div>
+    <p class="alt"><a href="/login">Back to log in</a></p>
+  <% } else { %>
+    <p class="muted">Enter the email you signed up with and we'll send you a link to choose a new password.</p>
+    <% if (typeof error !== 'undefined') { %><div class="notice error"><%= error %></div><% } %>
+    <form method="post" action="/forgot">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" value="<%= email %>" required autofocus>
+      </div>
+      <button class="btn block big">Email me a link</button>
+    </form>
+    <p class="alt">Remembered it? <a href="/login">Log in</a></p>
+  <% } %>
+</div>
+<%- include('../partials/foot') %>

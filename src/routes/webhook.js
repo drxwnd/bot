@@ -16,6 +16,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     return res.sendStatus(400);
   }
 
+  // Stripe retries and can deliver the same event twice. Handle each one once.
+  const seen = db.prepare('INSERT OR IGNORE INTO stripe_events (id, type) VALUES (?, ?)').run(event.id, event.type);
+  if (!seen.changes) return res.json({ received: true, duplicate: true });
+
   try {
     switch (event.type) {
       case 'checkout.session.completed':
@@ -31,10 +35,21 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         );
         break;
       }
+      case 'charge.dispute.created':
+        payments.disputeOpened(event.data.object);
+        break;
+      case 'charge.dispute.closed':
+        payments.disputeClosed(event.data.object);
+        break;
+      case 'charge.refunded':
+        payments.refundedInStripe(event.data.object);
+        break;
     }
     res.json({ received: true });
   } catch (err) {
     console.error('Stripe webhook failed:', err);
+    // Forget it so Stripe's retry gets processed.
+    db.prepare('DELETE FROM stripe_events WHERE id = ?').run(event.id);
     res.sendStatus(500);
   }
 });

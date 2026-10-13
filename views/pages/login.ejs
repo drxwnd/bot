@@ -16,6 +16,6 @@
     <button class="btn block big">Log in</button>
   </form>
   <p class="alt">New here? <a href="/signup<%= next ? '?next=' + encodeURIComponent(next) : '' %>">Create an account</a> or <a href="/signup?as=tradie">join as a tradie</a>.</p>
-  <p class="alt">Forgotten your password? Email <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a> and we'll reset it.</p>
+  <p class="alt"><a href="/forgot">Forgotten your password?</a></p>
 </div>
 <%- include('../partials/foot') %>

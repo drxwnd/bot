@@ -13,6 +13,7 @@ process.env.ADMIN_EMAIL = 'boss@test.local';
 
 const app = require('../server');
 const db = require('../src/db');
+const mailer = require('../src/mailer');
 
 let server;
 let base;
@@ -175,14 +176,14 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   await stranger.post(`/quotes/${quote.id}/accept`, {});
   assert.strictEqual(db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId).status, 'open');
 
-  // Customer accepts and sees contact details; tradie sees the address.
+  // Customer accepts. Contact details stay hidden on both sides until the job is paid.
   res = await customer.get(jobUrl);
   assert.match(res.text, /Terry Tiles/);
   await customer.post(`/quotes/${quote.id}/accept`, {});
   res = await customer.get(jobUrl);
-  assert.match(res.text, /terry@test\.local/);
+  assert.doesNotMatch(res.text, /terry@test\.local/);
   res = await tradie.get(jobUrl);
-  assert.match(res.text, /1 Test St/);
+  assert.doesNotMatch(res.text, /1 Test St/);
 
   // Customer pays (simulated). Money held.
   res = await customer.get(jobUrl);
@@ -191,6 +192,12 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   let payment = db.prepare('SELECT * FROM payments WHERE job_id = ?').get(jobId);
   assert.strictEqual(payment.status, 'held');
   assert.strictEqual(payment.fee_cents, 4000);
+
+  // Now both sides can see each other's details.
+  res = await customer.get(jobUrl);
+  assert.match(res.text, /terry@test\.local/);
+  res = await tradie.get(jobUrl);
+  assert.match(res.text, /1 Test St/);
 
   // Release blocked until the tradie sets up payouts.
   await customer.get(jobUrl);
@@ -210,6 +217,19 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   await customer.post(`${jobUrl}/review`, { rating: '5', comment: 'Tidy work, on time.' });
   res = await browser().get(`/tradies/${tradieId}`);
   assert.match(res.text, /Tidy work, on time\./);
+
+  // Everyone was emailed at each step.
+  await mailer.flush();
+  const kinds = db.prepare('SELECT kind, to_email FROM emails').all();
+  const sent = (kind, to) => kinds.some((e) => e.kind === kind && e.to_email === to);
+  assert.ok(sent('admin_new_tradie', 'boss@test.local'), 'admin told about new tradie');
+  assert.ok(sent('tradie_approved', 'terry@test.local'), 'tradie told they are approved');
+  assert.ok(sent('quote_received', 'casey@test.local'), 'customer told about quote');
+  assert.ok(sent('quote_accepted', 'terry@test.local'), 'tradie told quote accepted');
+  assert.ok(sent('paid_to_tradie', 'terry@test.local'), 'tradie told job is paid');
+  assert.ok(sent('payment_receipt', 'casey@test.local'), 'customer sent receipt');
+  assert.ok(sent('released', 'terry@test.local'), 'tradie told payout is coming');
+  assert.ok(sent('review_request', 'casey@test.local'), 'customer asked for review');
 
   // Admin totals reflect the 4% fee.
   res = await admin.get('/admin');

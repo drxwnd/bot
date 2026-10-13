@@ -18,7 +18,7 @@
     <li>You must hold an active ABN, any licence or registration required by WA law for the work you quote on, and current public liability insurance.</li>
     <li>Our checks are based on information you give us and public registers at the time. They are not a guarantee of the quality of your work.</li>
     <li>Quotes must be the full price including GST for the work described. You're responsible for doing the work with due care and skill, safely, and in line with all applicable laws and standards.</li>
-    <li>You agree to pay our service fee of <%= feePercent %>% of the quote amount on each job you win through <%= siteName %>. The fee is deducted from the payment before it's paid out to you.</li>
+    <li>You agree to pay our service fee of <%= feePercent %>% of the quote amount<% if (feeLabel !== feePercent + '%') { %>, with the minimum shown on the For tradies page,<% } %> on each job you win through <%= siteName %>. The fee is deducted from the payment before it's paid out to you.</li>
     <li>For 12 months after you're introduced to a customer through <%= siteName %>, you agree not to arrange paid work with that customer outside the platform to avoid our fee.</li>
   </ul>
 
@@ -26,6 +26,7 @@
   <ul>
     <li>Job descriptions must be accurate. Don't include your contact details in the public description.</li>
     <li>Accepting a quote means you intend to go ahead with the work at that price. You'll then be asked to pay.</li>
+    <% if (customerFeePercent) { %><li>When you pay, a secure payment fee of <%= customerFeePercent %>% of the quote is added. It covers card processing and holding your money until the job is done, and is refunded if your payment is refunded.</li><% } %>
     <li>Only release payment once the work is complete. Releasing payment tells us the job has been done to your satisfaction.</li>
   </ul>
 

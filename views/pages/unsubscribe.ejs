@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<div class="auth">
+  <% if (alerts) { %>
+    <h1>Turn off job alerts?</h1>
+    <p class="muted">We'll stop emailing <strong><%= email %></strong> about new jobs and reminders. You'll still get emails about jobs you're part of, like quotes, payments and payouts.</p>
+    <form method="post" action="/unsubscribe">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="u" value="<%= u %>">
+      <input type="hidden" name="t" value="<%= t %>">
+      <input type="hidden" name="on" value="0">
+      <button class="btn block big">Turn them off</button>
+    </form>
+  <% } else { %>
+    <h1>Job alerts are off</h1>
+    <p class="muted">We won't email <strong><%= email %></strong> about new jobs or send reminders. Changed your mind?</p>
+    <form method="post" action="/unsubscribe">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="u" value="<%= u %>">
+      <input type="hidden" name="t" value="<%= t %>">
+      <input type="hidden" name="on" value="1">
+      <button class="btn ghost block big">Turn them back on</button>
+    </form>
+  <% } %>
+</div>
+<%- include('../partials/foot') %>
