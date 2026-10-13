@@ -76,7 +76,11 @@
     <% if (can('money')) { %>
       <section class="card">
         <div class="card-head"><h2>Paid to you, last 6 months</h2><a href="/dashboard/earnings">Earnings</a></div>
-        <%- include('../partials/bar-chart', { months, width: 340, height: 200, label: 'Money paid to you each month for the last six months' }) %>
+        <% if (months.some(m => m.cents > 0)) { %>
+          <%- include('../partials/bar-chart', { months, width: 340, height: 200, label: 'Money paid to you each month for the last six months' }) %>
+        <% } else { %>
+          <p class="muted small" style="margin:0">Once customers sign off your jobs, what you've been paid each month shows here.</p>
+        <% } %>
       </section>
     <% } %>
     <section class="card">

@@ -11,7 +11,11 @@
 </div>
 <section class="card">
   <div class="card-head"><h2>Paid to you each month</h2></div>
-  <%- include('../partials/bar-chart', { months, label: 'Money paid to you each month for the last twelve months' }) %>
+  <% if (months.some(m => m.cents > 0)) { %>
+    <%- include('../partials/bar-chart', { months, label: 'Money paid to you each month for the last twelve months' }) %>
+  <% } else { %>
+    <p class="muted small" style="margin:0">Nothing paid out yet. When a customer signs off one of your jobs, it shows here.</p>
+  <% } %>
   <details class="table-toggle">
     <summary>Show as a table</summary>
     <table>
