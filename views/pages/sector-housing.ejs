@@ -1,9 +1,12 @@
 <%- include('../partials/head') %>
 <div class="wrap">
-  <div class="page-head">
-    <h1>Repairs and building work for your home</h1>
-    <p>For homeowners, landlords and property managers. Post the job for free, compare quotes from checked tradies, and only pay out when the work's done.</p>
-    <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?sector=housing">Post a home job</a></p>
+  <div class="page-head with-photo">
+    <div>
+      <h1>Repairs and building work for your home</h1>
+      <p>For homeowners, landlords and property managers. Post the job for free, compare quotes from checked tradies, and only pay out when the work's done.</p>
+      <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?sector=housing">Post a home job</a></p>
+    </div>
+    <%- include('../partials/photo', { photo: 'bathroomTiles', eager: true }) %>
   </div>
 
   <div class="split page" style="padding-top:8px">

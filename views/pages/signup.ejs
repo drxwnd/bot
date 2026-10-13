@@ -1,4 +1,5 @@
 <%- include('../partials/head') %>
+<div class="auth-wrap">
 <div class="auth">
   <div class="choice">
     <a href="/signup<%= next ? '?next=' + encodeURIComponent(next) : '' %>" class="<%= as === 'customer' ? 'on' : '' %>">I need work done</a>
@@ -48,5 +49,7 @@
     <p class="small muted" style="margin-top:14px">By signing up you agree to our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
   </form>
   <p class="alt">Already have an account? <a href="/login<%= next ? '?next=' + encodeURIComponent(next) : '' %>">Log in</a></p>
+</div>
+<%- include('../partials/photo', { photo: as === 'tradie' ? 'electrician' : 'bathroomTiles', cls: 'auth-photo', eager: true }) %>
 </div>
 <%- include('../partials/foot') %>

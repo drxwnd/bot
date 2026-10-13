@@ -1,0 +1,5 @@
+<% const p = PHOTOS[photo]; %>
+<figure class="photo <%= typeof cls !== 'undefined' ? cls : '' %>">
+  <img src="/img/photos/<%= p.file %>" alt="<%= p.alt %>" width="<%= p.width %>" height="<%= p.height %>" <%- typeof eager !== 'undefined' && eager ? 'fetchpriority="high"' : 'loading="lazy"' %> decoding="async">
+  <figcaption>Photo: <a href="<%= p.source %>" rel="nofollow noopener" target="_blank"><%= p.creator %></a>, <a href="<%= p.licenseUrl %>" rel="nofollow noopener license" target="_blank"><%= p.license %></a></figcaption>
+</figure>

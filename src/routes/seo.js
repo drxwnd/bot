@@ -202,6 +202,7 @@ router.get('/sitemap.xml', (req, res) => {
   for (const p of q.profiles.all()) add(`/tradies/${p.id}`, '0.5', (p.updated || today).slice(0, 10), 'monthly');
   add('/terms', '0.2', today, 'yearly');
   add('/privacy', '0.2', today, 'yearly');
+  add('/photo-credits', '0.1', today, 'yearly');
 
   const xml =
     '<?xml version="1.0" encoding="UTF-8"?>\n' +

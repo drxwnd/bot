@@ -81,6 +81,9 @@ router.get('/for-tradies', (req, res) => {
 router.get('/terms', (req, res) =>
   res.render('pages/terms', { title: 'Terms of use', description: 'The terms for using the site as a customer or a tradie.' }),
 );
+router.get('/photo-credits', (req, res) =>
+  res.render('pages/photo-credits', { title: 'Photo credits', description: 'Who took the photos used on the site, and their licences.' }),
+);
 router.get('/privacy', (req, res) =>
   res.render('pages/privacy', { title: 'Privacy', description: 'What personal information we collect, why, and who sees it.' }),
 );

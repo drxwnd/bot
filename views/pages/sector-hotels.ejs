@@ -1,9 +1,12 @@
 <%- include('../partials/head') %>
 <div class="wrap">
-  <div class="page-head">
-    <h1>Maintenance and repairs for hotels and short-stay</h1>
-    <p>A room that's out of order is a room you can't sell. Post the job, say when the work can happen, and get prices from tradies who are used to working around guests.</p>
-    <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?sector=hotels">Post a hotel job</a></p>
+  <div class="page-head with-photo">
+    <div>
+      <h1>Maintenance and repairs for hotels and short-stay</h1>
+      <p>A room that's out of order is a room you can't sell. Post the job, say when the work can happen, and get prices from tradies who are used to working around guests.</p>
+      <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?sector=hotels">Post a hotel job</a></p>
+    </div>
+    <%- include('../partials/photo', { photo: 'bathroomFinished', eager: true }) %>
   </div>
 
   <div class="split page" style="padding-top:8px">

@@ -1,0 +1,18 @@
+<%- include('../partials/head') %>
+<div class="wrap narrow page doc">
+  <h1>Photo credits</h1>
+  <p>The photos on this site were taken by the people below and shared under Creative Commons licences. Thanks to all of them. Photos are resized but otherwise unchanged.</p>
+  <div class="credit-list">
+    <% Object.values(PHOTOS).forEach(p => { %>
+      <div class="credit">
+        <img src="/img/photos/<%= p.file %>" alt="" width="<%= p.width %>" height="<%= p.height %>" loading="lazy" decoding="async">
+        <div>
+          <p><%= p.alt %></p>
+          <p class="small muted">By <a href="<%= p.source %>" rel="nofollow noopener"><%= p.creator %></a> · <a href="<%= p.licenseUrl %>" rel="nofollow noopener license"><%= p.license %></a></p>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+  <p class="small muted">If one of these is yours and you'd like it credited differently or taken down, email <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a>.</p>
+</div>
+<%- include('../partials/foot') %>

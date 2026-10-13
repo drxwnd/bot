@@ -10,6 +10,7 @@ const { locals } = require('./src/helpers');
 const { loadSession, verifyCsrf } = require('./src/middleware');
 const seo = require('./src/seo');
 const { TRADE_INFO, REGION_INFO } = require('./src/seo-content');
+const { PHOTOS } = require('./src/photos');
 
 const app = express();
 
@@ -22,6 +23,7 @@ Object.assign(app.locals, locals, {
   feePercent: config.feePercent,
   TRADE_INFO,
   REGION_INFO,
+  PHOTOS,
   jsonForScript: seo.jsonForScript,
 });
 

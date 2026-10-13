@@ -2300,3 +2300,136 @@ aside .row {
   grid-template-columns: 1fr;
   gap: 0;
 }
+
+/* ---------- Photos ---------- */
+.photo {
+  margin: 0;
+}
+
+.photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r);
+  background: var(--paper-2);
+  object-fit: cover;
+}
+
+.photo figcaption {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.photo figcaption a {
+  color: inherit;
+}
+
+.photo.wide img {
+  aspect-ratio: 3 / 2;
+}
+
+.doc .photo.wide {
+  margin-bottom: 40px;
+}
+
+.sector-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+.sector-card h3 {
+  margin: 18px 0 6px;
+  font-size: 1.35rem;
+}
+
+.sector-card p {
+  margin: 0 0 10px;
+  color: var(--ink-2);
+}
+
+.page-head.with-photo {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 48px;
+  align-items: center;
+}
+
+.page-head.with-photo .photo img {
+  aspect-ratio: 4 / 3;
+}
+
+.auth-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 460px) minmax(0, 440px);
+  justify-content: center;
+  gap: 56px;
+  align-items: start;
+  padding: 0 24px;
+}
+
+.auth-wrap .auth {
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.auth-photo {
+  position: sticky;
+  top: 24px;
+  margin-top: 56px;
+}
+
+.auth-photo img {
+  aspect-ratio: 4 / 5;
+}
+
+.credit-list {
+  margin: 32px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.credit {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.credit img {
+  width: 120px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--r);
+}
+
+.credit p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .sector-cards {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .page-head.with-photo {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .page-head.with-photo .photo img {
+    aspect-ratio: 16 / 9;
+  }
+
+  .auth-wrap {
+    grid-template-columns: minmax(0, 460px);
+  }
+
+  .auth-photo {
+    display: none;
+  }
+}
