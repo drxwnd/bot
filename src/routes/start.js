@@ -154,6 +154,7 @@ router.get('/start', (req, res) => {
       .filter((j) => state.trades.includes(j.trade) && state.sectors.includes(j.sector) && state.regions.includes(j.region));
   }
 
+  view.quizStep = view.progress.at;
   res.render('pages/start', view);
 });
 

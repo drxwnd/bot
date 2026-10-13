@@ -14,6 +14,7 @@
     <span class="quiz-count"><%= step === 'result' ? 'Done' : `${progress.at} of ${progress.total}` %></span>
   </div>
   <div class="quiz-bar"><span style="width:<%= Math.round((progress.at / progress.total) * 100) %>%"></span></div>
+  <div class="quiz-body">
 
   <% if (step === 'path') { %>
     <h1>What brings you here?</h1>
@@ -171,5 +172,6 @@
       <p class="small muted" style="text-align:center;margin-top:12px">We've saved your answers, so your business details will be filled in.</p>
     <% } %>
   <% } %>
+  </div>
 </div>
 <%- include('../partials/foot') %>

@@ -1,0 +1,165 @@
+/* Animated transitions between get-started quiz steps.
+   Uses cross-document view transitions where the browser supports them (Chrome, Edge, Safari),
+   with a simple fade-in elsewhere. Turned off for people who prefer reduced motion. */
+
+@view-transition {
+  navigation: auto;
+}
+
+/* Keep the header, footer and page frame still. Only the question slides. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+.quiz-body {
+  view-transition-name: quiz-body;
+}
+
+.quiz-bar span {
+  view-transition-name: quiz-progress;
+}
+
+.quiz-count {
+  view-transition-name: quiz-count;
+}
+
+::view-transition-group(quiz-body) {
+  animation: none;
+}
+
+::view-transition-old(quiz-body) {
+  animation: quiz-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+::view-transition-new(quiz-body) {
+  animation: quiz-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) 0.14s both;
+}
+
+html[data-quiz-dir='back']::view-transition-old(quiz-body) {
+  animation-name: quiz-out-back;
+}
+
+html[data-quiz-dir='back']::view-transition-new(quiz-body) {
+  animation-name: quiz-in-back;
+}
+
+/* The progress bar grows (or shrinks) into its new width. */
+::view-transition-group(quiz-progress) {
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+::view-transition-old(quiz-progress),
+::view-transition-new(quiz-progress) {
+  animation: none;
+  height: 100%;
+}
+
+::view-transition-group(quiz-count) {
+  animation-duration: 0.25s;
+}
+
+@keyframes quiz-out {
+  to {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+}
+
+@keyframes quiz-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+@keyframes quiz-out-back {
+  to {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes quiz-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+/* Browsers without view transitions still get a gentle entrance. */
+@supports not (view-transition-name: none) {
+  .quiz-body {
+    animation: quiz-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+@keyframes quiz-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Options, plan rows and the result notes arrive one after another. */
+.quiz .opt,
+.quiz .plan > div,
+.quiz .match,
+.quiz .next-list li {
+  animation: quiz-item 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes quiz-item {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.quiz .opts > :nth-child(1), .quiz .plan > :nth-child(1), .quiz .next-list li:nth-child(1) { animation-delay: 0.14s; }
+.quiz .opts > :nth-child(2), .quiz .plan > :nth-child(2), .quiz .next-list li:nth-child(2) { animation-delay: 0.19s; }
+.quiz .opts > :nth-child(3), .quiz .plan > :nth-child(3), .quiz .next-list li:nth-child(3) { animation-delay: 0.24s; }
+.quiz .opts > :nth-child(4), .quiz .plan > :nth-child(4), .quiz .next-list li:nth-child(4) { animation-delay: 0.29s; }
+.quiz .opts > :nth-child(5), .quiz .next-list li:nth-child(5) { animation-delay: 0.33s; }
+.quiz .opts > :nth-child(6) { animation-delay: 0.37s; }
+.quiz .opts > :nth-child(7) { animation-delay: 0.4s; }
+.quiz .opts > :nth-child(n + 8) { animation-delay: 0.43s; }
+.quiz .match { animation-delay: 0.34s; }
+
+/* A quick press, then the chosen answer lights up before the next step slides in. */
+.quiz .opt {
+  transition: transform 0.12s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quiz .opt:active {
+  transform: scale(0.985);
+}
+
+.quiz .opt.is-chosen {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: #fbf3ee;
+}
+
+.quiz .opt.is-chosen strong {
+  color: var(--accent-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+
+  .quiz-body,
+  .quiz .opt,
+  .quiz .plan > div,
+  .quiz .match,
+  .quiz .next-list li {
+    animation: none;
+  }
+
+  .quiz .opt:active {
+    transform: none;
+  }
+}
