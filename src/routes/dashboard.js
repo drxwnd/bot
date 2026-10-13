@@ -39,7 +39,23 @@ const q = {
       regions = excluded.regions, tickets = excluded.tickets, licence_no = excluded.licence_no, insurer = excluded.insurer,
       insurance_expiry = excluded.insurance_expiry, years_trading = excluded.years_trading, bio = excluded.bio`),
   updateUser: db.prepare('UPDATE users SET name = ?, phone = ? WHERE id = ?'),
+  recheck: db.prepare("UPDATE tradie_profiles SET status = 'pending' WHERE user_id = ?"),
 };
+
+// Changes to these need checking again before the tradie can keep quoting.
+function needsRecheck(before, values) {
+  if (!before || before.status !== 'approved') return false;
+  const today = new Date().toISOString().slice(0, 10);
+  const oldTrades = before.trades.split(',');
+  return (
+    before.business_name !== values.business_name ||
+    before.abn !== values.abn ||
+    (before.licence_no || null) !== values.licence_no ||
+    (before.insurer || null) !== values.insurer ||
+    (values.insurance_expiry !== before.insurance_expiry && (values.insurance_expiry || '') < today) ||
+    values.trades.some((t) => !oldTrades.includes(t))
+  );
+}
 
 router.get('/dashboard', requireLogin, (req, res) => {
   const user = req.user;
@@ -120,6 +136,7 @@ router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), 
 
   req.session.intent = null;
   const before = req.user.profile;
+  const recheck = needsRecheck(before, values);
   db.transaction(() => {
     q.updateUser.run(values.name, values.phone || null, req.account.ownerId);
     q.upsertProfile.run({
@@ -128,15 +145,18 @@ router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), 
       trades: values.trades.join(','),
       regions: values.regions.join(','),
     });
+    if (recheck) q.recheck.run(req.account.ownerId);
   })();
-  if (!before || before.status !== 'approved') notify.tradieSubmitted(req.account.ownerId);
+  if (!before || before.status !== 'approved' || recheck) notify.tradieSubmitted(req.account.ownerId);
 
   flash(
     req,
     'success',
-    before && before.status === 'approved'
-      ? 'Details saved.'
-      : "Thanks. We'll check your ABN, licence and insurance, usually within one business day.",
+    recheck
+      ? "Saved. Because your business, licence, insurance or trades changed, we'll check them again before you quote on new jobs. Usually within one business day."
+      : before && before.status === 'approved'
+        ? 'Details saved.'
+        : "Thanks. We'll check your ABN, licence and insurance, usually within one business day.",
   );
   res.redirect('/dashboard');
 });

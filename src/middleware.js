@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const { can, ROLE_NAMES } = require('./permissions');
 
-const getUser = db.prepare('SELECT id, email, name, phone, role, company, admin_level FROM users WHERE id = ?');
+const getUser = db.prepare("SELECT id, email, name, phone, role, company, admin_level, session_key, password_hash = '!' AS disabled FROM users WHERE id = ?");
 const getProfile = db.prepare('SELECT * FROM tradie_profiles WHERE user_id = ?');
 const getMembership = db.prepare("SELECT * FROM team_members WHERE user_id = ? AND status = 'active'");
 
@@ -11,7 +11,14 @@ function loadSession(req, res, next) {
   if (!req.session.csrf) req.session.csrf = crypto.randomBytes(24).toString('hex');
 
   req.user = req.session.uid ? getUser.get(req.session.uid) : null;
-  if (req.session.uid && !req.user) req.session.uid = null;
+  // The session must carry the user's current key, and the login mustn't have been disabled.
+  if (req.user && (req.session.sk !== req.user.session_key || req.user.disabled)) {
+    req.user = null;
+  }
+  if (req.session.uid && !req.user) {
+    req.session.uid = null;
+    req.session.sk = null;
+  }
 
   // Work out whose account this person is acting for. Team members act for the owner.
   req.account = null;
@@ -38,22 +45,36 @@ function loadSession(req, res, next) {
   next();
 }
 
+// Log a user in: a fresh CSRF token and the user's current session key.
+const keyFor = db.prepare('SELECT session_key FROM users WHERE id = ?');
+function logIn(req, userId) {
+  req.session.uid = userId;
+  req.session.sk = keyFor.get(userId).session_key;
+  req.session.csrf = crypto.randomBytes(24).toString('hex');
+}
+
+// Change a user's session key, which logs them out on every device.
+const rotate = db.prepare('UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE id = ?');
+function logOutEverywhere(userId) {
+  rotate.run(userId);
+}
+
 function flash(req, type, text) {
   req.session.flash = { type, text };
 }
 
+// Constant-time string compare that copes with different lengths and multibyte input.
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a));
+  const y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
 function verifyCsrf(req, res, next) {
   if (req.method !== 'POST') return next();
-  const sent = (req.body && req.body._csrf) || req.get('x-csrf-token');
+  const sent = String((req.body && req.body._csrf) || req.get('x-csrf-token') || '');
   const expected = req.session.csrf;
-  if (
-    sent &&
-    expected &&
-    sent.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(expected))
-  ) {
-    return next();
-  }
+  if (expected && safeEqual(sent, expected)) return next();
   res.status(403).render('pages/error', {
     title: 'Form expired',
     message: 'That form timed out. Go back, refresh the page and try again.',
@@ -95,4 +116,4 @@ function requireApprovedTradie(req, res, next) {
   res.redirect('/dashboard');
 }
 
-module.exports = { loadSession, flash, verifyCsrf, requireLogin, requireRole, requireCan, requireApprovedTradie };
+module.exports = { loadSession, flash, verifyCsrf, safeEqual, logIn, logOutEverywhere, requireLogin, requireRole, requireCan, requireApprovedTradie };

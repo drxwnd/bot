@@ -35,7 +35,7 @@
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <textarea name="body" placeholder="What did you find? What's left to do? Anything the next person should know?" style="min-height:80px"></textarea>
         <div class="note-actions">
-          <label class="file-pick">Add a photo <input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/heic"></label>
+          <label class="file-pick">Add a photo <input type="file" name="photo" accept="image/*"></label>
           <button class="btn small">Post</button>
         </div>
       </form>
@@ -44,7 +44,7 @@
         <div class="note">
           <div class="small muted"><strong style="color:var(--ink)"><%= n.author %></strong> · <%= ago(n.created_at) %></div>
           <% if (n.body) { %><p class="prose" style="margin:6px 0 0"><%= n.body %></p><% } %>
-          <% if (n.photo) { %><a href="/uploads/<%= n.photo %>" target="_blank" rel="noopener"><img src="/uploads/<%= n.photo %>" alt="Job photo" class="note-photo" loading="lazy"></a><% } %>
+          <% if (n.photo) { %><a href="/work/<%= work.id %>/photos/<%= n.photo %>" target="_blank" rel="noopener"><img src="/work/<%= work.id %>/photos/<%= n.photo.replace(/\.jpg$/, '-sm.jpg') %>" alt="Job photo" class="note-photo" loading="lazy"></a><% } %>
         </div>
       <% }) %>
 

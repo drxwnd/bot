@@ -145,6 +145,7 @@
               <% } else if (job.status === 'open' && qt.status === 'pending') { %>
                 <form method="post" action="/quotes/<%= qt.id %>/accept" data-confirm="Accept this quote for <%= money(qt.amount_cents) %>? Other quotes will be declined.">
                   <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <input type="hidden" name="amount_cents" value="<%= qt.amount_cents %>">
                   <button class="btn small">Accept quote</button>
                 </form>
               <% } else { %>
@@ -179,10 +180,10 @@
             <p class="small muted" style="margin:0">The customer accepted your quote of <%= money(accepted.amount_cents) %> and has been asked to pay. We'll hold it until the job's done. Best not to start until this page shows it's paid.</p>
           <% } else if (job.status === 'paid') { %>
             <h3>Paid. <%= money(accepted.amount_cents) %> held for you.</h3>
-            <p class="small muted" style="margin:0">Go ahead with the job. When the customer signs it off you'll get <strong><%= money(accepted.amount_cents - feeFor(accepted.amount_cents)) %></strong> paid out to your bank<% if (!user.profile.payouts_enabled) { %>. <a href="/dashboard/payouts">Set up payouts</a> first so there's no delay<% } %>.</p>
+            <p class="small muted" style="margin:0">Go ahead with the job. When the customer signs it off you'll get <strong><%= money(accepted.amount_cents - (payment ? payment.fee_cents : feeFor(accepted.amount_cents))) %></strong> paid out to your bank<% if (!user.profile.payouts_enabled) { %>. <a href="/dashboard/payouts">Set up payouts</a> first so there's no delay<% } %>.</p>
           <% } else if (job.status === 'completed') { %>
             <h3>Job complete</h3>
-            <p class="small muted" style="margin:0"><%= money(accepted.amount_cents - feeFor(accepted.amount_cents)) %> has been sent to your Stripe account. It usually lands in your bank within 2 business days.</p>
+            <p class="small muted" style="margin:0"><%= money(accepted.amount_cents - (payment ? payment.fee_cents : feeFor(accepted.amount_cents))) %> has been sent to your Stripe account. It usually lands in your bank within 2 business days.</p>
           <% } %>
         </div>
       <% } %>

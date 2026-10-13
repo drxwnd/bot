@@ -1,13 +1,10 @@
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 const express = require('express');
-const multer = require('multer');
 
 const db = require('../db');
 const config = require('../config');
 const C = require('../constants');
 const payments = require('../payments');
+const uploads = require('../uploads');
 const notify = require('../notify');
 const { parseDollars, money } = require('../helpers');
 const seo = require('../seo');
@@ -27,23 +24,11 @@ function requireJobAction(action, message) {
     res.redirect(`/jobs/${req.params.id}`);
   };
 }
+// Smallest quote we take. Card fees make tiny jobs pointless, and Stripe won't charge under 50c.
+const MIN_QUOTE_CENTS = 2000;
 const MANAGER_ONLY = 'Only a manager or the account owner can do that. Ask them to take a look.';
 
 const router = express.Router();
-
-const IMAGE_TYPES = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/heic': '.heic' };
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: config.uploadDir,
-    filename: (req, file, cb) => cb(null, crypto.randomBytes(12).toString('hex') + IMAGE_TYPES[file.mimetype]),
-  }),
-  limits: { fileSize: 8 * 1024 * 1024, files: 6 },
-  fileFilter: (req, file, cb) => cb(null, Boolean(IMAGE_TYPES[file.mimetype])),
-});
-
-function removeUploads(files) {
-  for (const f of files || []) fs.rm(path.join(config.uploadDir, f.filename), { force: true }, () => {});
-}
 
 const q = {
   job: db.prepare(`
@@ -159,9 +144,9 @@ router.post(
   '/jobs',
   requireRole('customer', 'admin'),
   requireCan('post'),
-  upload.array('photos', 6),
+  uploads.receive('photos', 6),
   verifyCsrf,
-  (req, res) => {
+  async (req, res, next) => {
     const b = req.body;
     const values = {
       customer_id: req.account.ownerId,
@@ -197,19 +182,24 @@ router.post(
       else Object.assign(values, { suburb: place.suburb, postcode: place.postcode, region: values.region || place.region });
     }
 
-    if (error) {
-      removeUploads(req.files);
-      return res.status(400).render('pages/job-new', { title: 'Post a job', values, error });
-    }
+    if (!error && req.uploadError) error = req.uploadError;
+    if (error) return res.status(400).render('pages/job-new', { title: 'Post a job', values, error });
 
+    let photos;
+    try {
+      photos = await uploads.saveAll(req.files);
+    } catch (err) {
+      return next(err);
+    }
     const id = db.transaction(() => {
       const jobId = Number(q.insertJob.run(values).lastInsertRowid);
-      for (const f of req.files || []) q.insertPhoto.run(jobId, f.filename);
+      for (const f of photos.saved) q.insertPhoto.run(jobId, f);
       return jobId;
     })();
+    if (photos.skipped) flash(req, 'info', uploads.UNREADABLE);
 
     notify.jobPosted(id);
-    flash(req, 'success', "Your job is live. We'll email you as quotes come in.");
+    if (!photos.skipped) flash(req, 'success', "Your job is live. We'll email you as quotes come in.");
     res.redirect(`/jobs/${id}`);
   },
 );
@@ -296,6 +286,8 @@ router.post('/jobs/:id/cancel', requireLogin, loadJob, ownsJob, requireJobAction
     q.cancelJob.run(req.job.id);
     q.declineAll.run(req.job.id);
   })();
+  // Close any checkout page that's still open, so nobody can pay for a cancelled job.
+  if (payment) payments.expireCheckout(payment).catch((err) => console.error('Could not expire checkout:', err.message));
   flash(req, 'success', 'Job closed. Tradies can no longer see it.');
   res.redirect('/dashboard');
 });
@@ -311,9 +303,19 @@ router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requ
   const amount = parseDollars(req.body.amount);
   const message = String(req.body.message || '').trim().slice(0, 3000);
   const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body.start_date || '') ? req.body.start_date : null;
+  const profile = req.user.profile;
+  const today = new Date().toISOString().slice(0, 10);
 
-  if (!amount) {
+  if (job.customer_id === req.account.ownerId) {
+    flash(req, 'error', "You can't quote on your own job.");
+  } else if (job.trade !== 'other' && !profile.trades.split(',').includes(job.trade)) {
+    flash(req, 'error', `This is a ${C.tradeName[job.trade].toLowerCase()} job. Add that trade to your business details (we'll check it) to quote on it.`);
+  } else if (!profile.insurance_expiry || profile.insurance_expiry < today) {
+    flash(req, 'error', 'Your public liability insurance has expired. Update the expiry date in your business details to keep quoting.');
+  } else if (!amount) {
     flash(req, 'error', 'Enter your price in dollars, e.g. 850 or 1,250.');
+  } else if (amount < MIN_QUOTE_CENTS) {
+    flash(req, 'error', `Quotes start at ${money(MIN_QUOTE_CENTS)}.`);
   } else if (config.maxQuoteCents && amount > config.maxQuoteCents) {
     flash(req, 'error', `Quotes on ${config.siteName} are limited to ${money(config.maxQuoteCents)} for now. Bigger building jobs in WA need a registered builder and a written contract, so arrange those directly.`);
   } else if (message.length < 20) {
@@ -349,6 +351,17 @@ router.post('/quotes/:id/accept', requireLogin, (req, res, next) => {
   if (job.status !== 'open' || quote.status !== 'pending') {
     flash(req, 'error', 'That quote can no longer be accepted.');
     return res.redirect(`/jobs/${job.id}`);
+  }
+  // The price must still be the one the customer was looking at, in case the tradie changed it since.
+  if (Number(req.body.amount_cents) !== quote.amount_cents) {
+    flash(req, 'error', `The tradie updated this quote to ${money(quote.amount_cents)}. Check the new price before accepting.`);
+    return res.redirect(`/jobs/${job.id}#quotes`);
+  }
+  // And the tradie must still be approved, with insurance that hasn't run out.
+  const tp = q.profile.get(quote.tradie_id);
+  if (!tp || tp.status !== 'approved' || !tp.insurance_expiry || tp.insurance_expiry < new Date().toISOString().slice(0, 10)) {
+    flash(req, 'error', "That tradie can't take new jobs right now while we recheck their details. Pick another quote, or wait a day.");
+    return res.redirect(`/jobs/${job.id}#quotes`);
   }
   db.transaction(() => {
     q.awardJob.run(quote.id, job.id);
@@ -410,6 +423,11 @@ router.post('/jobs/:id/release', requireLogin, loadJob, ownsJob, requireJobActio
 
 router.post('/jobs/:id/review', requireLogin, loadJob, ownsJob, (req, res) => {
   const job = req.job;
+  // Reviews come from the customer business itself, not staff and not Tradebench admins.
+  if (req.user.role === 'admin' || !can(req, 'accept')) {
+    flash(req, 'error', 'Only the account owner or a manager can leave the review.');
+    return res.redirect(`/jobs/${job.id}#review`);
+  }
   const rating = Number(req.body.rating);
   if (job.status !== 'completed' || q.review.get(job.id)) return res.redirect(`/jobs/${job.id}`);
   if (!(rating >= 1 && rating <= 5)) {

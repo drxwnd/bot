@@ -24,7 +24,8 @@
       </div>
       <div class="field">
         <label for="payment_details">How clients pay you</label>
-        <textarea id="payment_details" name="payment_details" style="min-height:90px" placeholder="e.g. Bank transfer to BSB 123-456, account 12345678, Russo Tiling. Use the invoice number as the reference."><%= profile.payment_details || '' %></textarea>
+        <textarea id="payment_details" name="payment_details" style="min-height:90px" placeholder="e.g. Bank transfer to BSB 123-456, account 12345678, Russo Tiling. Use the invoice number as the reference." <%= can('payouts') ? '' : 'readonly' %>><%= profile.payment_details || '' %></textarea>
+        <% if (!can('payouts')) { %><span class="hint">Only the account owner can change the bank details.</span><% } %>
         <span class="hint">Printed on every invoice.</span>
       </div>
       <button class="btn accent">Save settings</button>

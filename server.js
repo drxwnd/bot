@@ -91,8 +91,15 @@ app.use(express.static(path.join(__dirname, 'public'), { maxAge: config.isProd ?
 fs.mkdirSync(config.uploadDir, { recursive: true });
 app.use('/uploads', express.static(config.uploadDir, { maxAge: '30d' }));
 
-// Multipart forms are parsed inside their route (multer), which then runs verifyCsrf itself.
-app.use((req, res, next) => (req.is('multipart/form-data') ? next() : verifyCsrf(req, res, next)));
+// Multipart forms are parsed inside their route (multer), which then runs verifyCsrf itself. Only
+// the routes that really take files are let through here; any other multipart POST is refused, so
+// it can't be used to skip the CSRF check.
+const MULTIPART_ROUTES = [/^\/jobs$/, /^\/work\/\d+\/notes$/, /^\/dashboard\/profile\/photos$/];
+app.use((req, res, next) => {
+  if (!req.is('multipart/form-data')) return verifyCsrf(req, res, next);
+  if (req.method === 'POST' && MULTIPART_ROUTES.some((re) => re.test(req.path))) return next();
+  res.status(403).render('pages/error', { title: 'Form expired', message: 'That form timed out. Go back, refresh the page and try again.' });
+});
 
 app.use(require('./src/routes/seo'));
 app.use(require('./src/routes/start'));

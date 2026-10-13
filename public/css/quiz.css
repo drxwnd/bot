@@ -10,6 +10,13 @@
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
+  mix-blend-mode: normal;
+}
+
+/* The old page would otherwise sit behind the new one until the question has finished sliding,
+   showing its footer through the new page whenever the two are different heights. */
+::view-transition-old(root) {
+  display: none;
 }
 
 .quiz-body {

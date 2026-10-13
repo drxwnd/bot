@@ -114,6 +114,11 @@ function disputeOpened(jobId) {
   for (const a of admins()) send(a, 'admin_dispute', E.disputeOpened(a, job, payment));
 }
 
+function adminAlert(text) {
+  console.warn('Admin alert:', text);
+  for (const a of admins()) send(a, 'admin_alert', E.adminAlert(a, text));
+}
+
 function teamInvite(invite, businessName, link) {
   send(invite.email, 'team_invite', E.teamInvite(invite, businessName, link));
 }
@@ -137,7 +142,7 @@ module.exports = {
   ...Object.fromEntries(
     Object.entries({
       jobPosted, quoteReceived, quoteAccepted, paymentHeld, paymentReleased, refunded,
-      tradieReviewed, tradieSubmitted, disputeOpened, teamInvite, passwordReset,
+      tradieReviewed, tradieSubmitted, disputeOpened, teamInvite, passwordReset, adminAlert,
     }).map(([k, fn]) => [k, safe(fn)]),
   ),
   admins,

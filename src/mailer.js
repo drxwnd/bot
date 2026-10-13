@@ -15,6 +15,10 @@ const q = {
 const quiet = process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT);
 const pending = new Set();
 
+// Outside production, the last few emails are kept in memory with their links intact, for tests
+// and local testing. Never in production, where links are only ever in the email itself.
+const outbox = [];
+
 async function deliver(message) {
   if (config.resendApiKey) {
     const res = await fetch('https://api.resend.com/emails', {
@@ -60,7 +64,13 @@ async function deliver(message) {
 // message: { to, kind, subject, text, html }
 function send(message) {
   if (!message || !message.to) return Promise.resolve();
-  const id = q.insert.run(message.to, message.kind, message.subject, message.text).lastInsertRowid;
+  // Reset and invite links are live passwords, so they're blanked out in the log.
+  const logged = message.text.replace(/\/(reset|invite)\/[A-Za-z0-9_-]+/g, '/$1/[link removed]');
+  const id = q.insert.run(message.to, message.kind, message.subject, logged).lastInsertRowid;
+  if (!config.isProd) {
+    outbox.push(message);
+    if (outbox.length > 100) outbox.shift();
+  }
   const p = deliver(message)
     .then((status) => q.done.run(status, null, id))
     .catch((err) => {
@@ -77,4 +87,4 @@ function flush() {
   return Promise.all([...pending]);
 }
 
-module.exports = { send, flush };
+module.exports = { send, flush, outbox };

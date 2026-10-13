@@ -98,6 +98,18 @@ async function startCheckout(job, quote, customer) {
   }
   if (payment.status !== 'pending') throw new Error('This job has already been paid');
 
+  // Reuse the checkout page already made for this job while it's still open, so two tabs (or two
+  // people on the same account) can't end up paying twice. A finished one is confirmed instead.
+  if (stripe && payment.stripe_session_id) {
+    const existing = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
+    if (existing.status === 'open' && existing.amount_total === payment.amount_cents + payment.customer_fee_cents) return existing.url;
+    if (existing.status === 'complete') {
+      await confirmCheckoutSession(existing);
+      return `/jobs/${job.id}?paid=1`;
+    }
+    if (existing.status === 'open') await stripe.checkout.sessions.expire(existing.id);
+  }
+
   if (!stripe) {
     if (!simulated) throw new Error('Payments are not configured');
     markHeld(payment.id, 'pi_simulated', 'ch_simulated');
@@ -143,11 +155,23 @@ function markHeld(paymentId, paymentIntent, chargeId) {
   const payment = q.paymentById.get(paymentId);
   if (!payment) return false;
   const changed = q.markHeld.run(paymentIntent, chargeId, paymentId).changes > 0;
-  if (changed) {
-    q.jobPaid.run(payment.job_id);
+  if (!changed) return false;
+  if (q.jobPaid.run(payment.job_id).changes) {
     notify.paymentHeld(payment.job_id);
+  } else {
+    // Paid for a job that isn't waiting for payment any more (it was cancelled while the
+    // checkout page was open). Send the money straight back and tell the admin.
+    refund(q.paymentById.get(paymentId)).catch((err) => console.error(`Auto-refund of payment ${paymentId} failed:`, err));
+    notify.adminAlert(`Payment ${paymentId} came in for job ${payment.job_id} after it was closed, so it was refunded automatically. Check it went through in Stripe.`);
   }
-  return changed;
+  return true;
+}
+
+// Close a checkout page that hasn't been paid yet.
+async function expireCheckout(payment) {
+  if (!stripe || !payment || payment.status !== 'pending' || !payment.stripe_session_id) return;
+  const s = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
+  if (s.status === 'open') await stripe.checkout.sessions.expire(s.id);
 }
 
 // Called from both the webhook and the success redirect, so it must be idempotent.
@@ -161,15 +185,48 @@ async function confirmCheckoutSession(sessionOrId) {
 
   const paymentId = Number(session.metadata?.payment_id);
   const payment = q.paymentById.get(paymentId);
-  if (!payment || payment.stripe_session_id !== session.id) return false;
+  if (!payment) return false;
+  // Any session we made for this payment counts, as long as it's for the right amount.
+  if (session.amount_total !== payment.amount_cents + payment.customer_fee_cents) {
+    notify.adminAlert(`Checkout ${session.id} for payment ${paymentId} was for ${session.amount_total} cents, not the expected amount. Check it in Stripe.`);
+    return false;
+  }
 
   const pi = await stripe.paymentIntents.retrieve(session.payment_intent);
+  if (payment.status !== 'pending' && payment.stripe_payment_intent && payment.stripe_payment_intent !== pi.id) {
+    // A second payment for a job that's already paid. Refund the extra one.
+    await stripe.refunds.create({ payment_intent: pi.id }, { idempotencyKey: `dup-refund-${pi.id}` });
+    notify.adminAlert(`A second payment (${pi.id}) came in for job ${payment.job_id}, which was already paid. It was refunded automatically.`);
+    return false;
+  }
   return markHeld(paymentId, pi.id, pi.latest_charge);
 }
 
 // ---- Release / refund ----
 
+// Only one money action per payment at a time. Release and refund each await Stripe, so without
+// this a release and a refund clicked at the same moment could both go through. One server runs
+// the site, so an in-memory lock is enough.
+const busy = new Set();
+async function exclusive(paymentId, fn) {
+  if (busy.has(paymentId)) throw new Error('That payment is already being processed. Refresh in a moment.');
+  busy.add(paymentId);
+  try {
+    return await fn();
+  } finally {
+    busy.delete(paymentId);
+  }
+}
+
 async function release(payment, tradieProfile) {
+  return exclusive(payment.id, () => doRelease(q.paymentById.get(payment.id), tradieProfile));
+}
+
+async function refund(payment) {
+  return exclusive(payment.id, () => doRefund(q.paymentById.get(payment.id)));
+}
+
+async function doRelease(payment, tradieProfile) {
   if (payment.status !== 'held') throw new Error('Nothing to release');
   if (payment.disputed) throw new Error('This payment is under a card dispute and cannot be released until that is resolved');
   const payout = payment.amount_cents - payment.fee_cents;
@@ -197,7 +254,7 @@ async function release(payment, tradieProfile) {
   }
 }
 
-async function refund(payment) {
+async function doRefund(payment) {
   if (payment.status !== 'held') throw new Error('Only held payments can be refunded');
   if (stripe) {
     await stripe.refunds.create(
@@ -257,6 +314,7 @@ module.exports = {
   release,
   refund,
   constructWebhookEvent,
+  expireCheckout,
   disputeOpened,
   disputeClosed,
   refundedInStripe,

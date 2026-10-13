@@ -8,7 +8,8 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
 const { TEAM_ROLES, ROLE_NAMES } = require('../permissions');
-const { flash, requireCan } = require('../middleware');
+const { flash, requireCan, logIn, logOutEverywhere } = require('../middleware');
+const { limit } = require('../ratelimit');
 const notify = require('../notify');
 
 const router = express.Router();
@@ -18,7 +19,8 @@ const q = {
     SELECT m.*, u.phone FROM team_members m LEFT JOIN users u ON u.id = m.user_id
     WHERE m.account_id = ? AND m.status != 'removed' ORDER BY m.status = 'invited', m.created_at`),
   member: db.prepare('SELECT * FROM team_members WHERE id = ? AND account_id = ?'),
-  byToken: db.prepare("SELECT * FROM team_members WHERE token = ? AND status = 'invited'"),
+  // Invites work for 14 days.
+  byToken: db.prepare("SELECT * FROM team_members WHERE token = ? AND status = 'invited' AND created_at > datetime('now', '-14 days')"),
   pendingForEmail: db.prepare("SELECT id FROM team_members WHERE account_id = ? AND email = ? AND status != 'removed'"),
   insert: db.prepare('INSERT INTO team_members (account_id, email, name, role, token) VALUES (?, ?, ?, ?, ?)'),
   setRole: db.prepare('UPDATE team_members SET role = ? WHERE id = ?'),
@@ -29,7 +31,6 @@ const q = {
   insertUser: db.prepare(
     'INSERT INTO users (email, password_hash, name, phone, role, company, admin_level) VALUES (?, ?, ?, ?, ?, ?, ?)',
   ),
-  removeUser: db.prepare('DELETE FROM users WHERE id = ?'),
 };
 
 const inviteUrl = (token) => `${config.siteUrl}/invite/${token}`;
@@ -49,7 +50,7 @@ router.get('/team', requireCan('team'), (req, res) => {
   req.session.newInvite = null;
 });
 
-router.post('/team/invite', requireCan('team'), (req, res) => {
+router.post('/team/invite', requireCan('team'), limit('team-invite', 30, 60 * 60 * 1000), (req, res) => {
   const kind = kindOf(req);
   const email = String(req.body.email || '').trim().toLowerCase();
   const name = String(req.body.name || '').trim().slice(0, 80);
@@ -89,13 +90,13 @@ router.post('/team/:id/remove', requireCan('team'), (req, res) => {
   if (member) {
     db.transaction(() => {
       q.remove.run(member.id);
-      // Their login only existed for this team, so it goes too. Their notes and hours stay on the jobs.
+      // Their login only existed for this team, so it's switched off for good and any session they
+      // have open ends now. The user row stays so their notes and hours stay on the jobs (and so its
+      // id can never be handed to someone else).
       if (member.user_id) {
-        const hasHistory = db.prepare(`
-          SELECT (SELECT COUNT(*) FROM work_notes WHERE user_id = @id) + (SELECT COUNT(*) FROM time_entries WHERE user_id = @id)
-            + (SELECT COUNT(*) FROM work_costs WHERE user_id = @id) + (SELECT COUNT(*) FROM jobs WHERE customer_id = @id) AS n`).get({ id: member.user_id }).n;
-        if (hasHistory) db.prepare("UPDATE users SET password_hash = '!' WHERE id = ?").run(member.user_id);
-        else q.removeUser.run(member.user_id);
+        db.prepare("UPDATE users SET password_hash = '!' WHERE id = ?").run(member.user_id);
+        db.prepare('UPDATE work_orders SET assigned_to = NULL WHERE assigned_to = ? AND account_id = ?').run(member.user_id, req.account.ownerId);
+        logOutEverywhere(member.user_id);
       }
     })();
     flash(req, 'success', `${member.name} has been removed and can no longer log in.`);
@@ -110,7 +111,7 @@ function loadInvite(req, res, next) {
   if (!invite) {
     return res.status(404).render('pages/error', {
       title: 'Invite not found',
-      message: 'This invite link has already been used or was cancelled. Ask whoever invited you for a new one.',
+      message: 'This invite link has expired, been used, or was cancelled. Ask whoever invited you for a new one.',
     });
   }
   req.invite = invite;
@@ -144,7 +145,7 @@ router.get('/invite/:token', loadInvite, (req, res) => {
   });
 });
 
-router.post('/invite/:token', loadInvite, async (req, res) => {
+router.post('/invite/:token', limit('invite', 20, 60 * 60 * 1000), loadInvite, async (req, res) => {
   const invite = req.invite;
   const owner = req.inviteOwner;
   const name = String(req.body.name || '').trim().slice(0, 80);
@@ -175,7 +176,7 @@ router.post('/invite/:token', loadInvite, async (req, res) => {
     return id;
   })();
 
-  req.session.uid = userId;
+  logIn(req, userId);
   flash(req, 'success', `Welcome to ${businessName(owner)}.`);
   res.redirect(owner.role === 'admin' ? '/admin' : owner.role === 'tradie' && invite.role === 'worker' ? '/work' : '/dashboard');
 });

@@ -8,25 +8,20 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
-const multer = require('multer');
 
 const db = require('../db');
 const config = require('../config');
 const { parseDollars, feeFor } = require('../helpers');
 const { can } = require('../permissions');
 const { flash, verifyCsrf, requireRole, requireCan } = require('../middleware');
+const uploads = require('../uploads');
 
 const router = express.Router();
-router.use(['/work', '/invoices'], requireRole('tradie'), requireCan('work.view'));
-
-const IMAGE_TYPES = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/heic': '.heic' };
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: config.uploadDir,
-    filename: (req, file, cb) => cb(null, crypto.randomBytes(12).toString('hex') + IMAGE_TYPES[file.mimetype]),
-  }),
-  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
-  fileFilter: (req, file, cb) => cb(null, Boolean(IMAGE_TYPES[file.mimetype])),
+router.use(['/work', '/invoices'], requireRole('tradie'), requireCan('work.view'), (req, res, next) => {
+  // Everything here hangs off the business details, so those come first.
+  if (req.user.profile) return next();
+  flash(req, 'info', 'Add your business details first. Then you can manage jobs and invoices here.');
+  res.redirect(can(req, 'profile') ? '/dashboard/profile' : '/dashboard');
 });
 
 const STATUS = {
@@ -292,7 +287,11 @@ router.post('/work/settings', requireCan('money'), (req, res) => {
     hourly_rate_cents: b.hourly_rate ? parseDollars(b.hourly_rate) : null,
     gst_registered: b.gst_registered ? 1 : 0,
     invoice_prefix: String(b.invoice_prefix || 'INV-').trim().slice(0, 12) || 'INV-',
-    payment_details: String(b.payment_details || '').trim().slice(0, 500) || null,
+    // Bank details printed on invoices can only be changed by the owner, so a manager can't
+    // redirect customer payments to their own account.
+    payment_details: can(req, 'payouts')
+      ? String(b.payment_details || '').trim().slice(0, 500) || null
+      : req.user.profile.payment_details,
   });
   flash(req, 'success', 'Settings saved.');
   res.redirect('/work/settings');
@@ -366,12 +365,33 @@ router.post('/work/:id/status', loadWork, (req, res) => {
   res.redirect(`/work/${req.work.id}`);
 });
 
-router.post('/work/:id/notes', upload.single('photo'), verifyCsrf, loadWork, (req, res) => {
+// Access is checked before the photo is even read, and it's only saved once the CSRF check passes.
+router.post('/work/:id/notes', loadWork, uploads.receive('photo', 1), verifyCsrf, async (req, res, next) => {
   const body = String(req.body.body || '').trim().slice(0, 3000) || null;
-  const photo = req.file ? req.file.filename : null;
-  if (body || photo) q.addNote.run(req.work.id, req.user.id, body, photo);
+  let photo = null;
+  if (req.file) {
+    try {
+      photo = await uploads.save(req.file, { isPrivate: true });
+    } catch {
+      flash(req, 'error', uploads.UNREADABLE);
+      return res.redirect(`/work/${req.work.id}#notes`);
+    }
+  }
+  if (req.uploadError) flash(req, 'error', req.uploadError);
+  else if (body || photo) q.addNote.run(req.work.id, req.user.id, body, photo);
   else flash(req, 'error', 'Write a note or add a photo.');
   res.redirect(`/work/${req.work.id}#notes`);
+});
+
+// Note photos are private to the business. Anyone who can open the work order can see them.
+router.get('/work/:id/photos/:file', loadWork, (req, res) => {
+  const note = db.prepare('SELECT 1 FROM work_notes WHERE work_id = ? AND (photo = ? OR replace(photo, \'.jpg\', \'-sm.jpg\') = ?)')
+    .get(req.work.id, req.params.file, req.params.file);
+  // Older photos have no thumbnail, so fall back to the full-size one.
+  const file = note && (uploads.privatePath(req.params.file) || uploads.privatePath(req.params.file.replace('-sm.jpg', '.jpg')));
+  if (!file) return res.sendStatus(404);
+  res.set('Cache-Control', 'private, max-age=86400');
+  res.sendFile(file);
 });
 
 router.post('/work/:id/time', loadWork, (req, res) => {

@@ -216,6 +216,11 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 );
 `);
 
+// Sessions carry this key. Changing it logs the user out everywhere (removed team members,
+// password resets).
+addColumn('users', 'session_key', 'TEXT');
+db.exec(`UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE session_key IS NULL`);
+
 // Notifications.
 addColumn('users', 'email_alerts', 'INTEGER NOT NULL DEFAULT 1');
 addColumn('payments', 'customer_fee_cents', 'INTEGER NOT NULL DEFAULT 0');
@@ -257,6 +262,24 @@ CREATE TABLE IF NOT EXISTS stripe_events (
   type        TEXT NOT NULL,
   received_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+`);
+
+// Indexes for the lookups the site does on every page.
+db.exec(`
+CREATE INDEX IF NOT EXISTS quotes_tradie ON quotes(tradie_id, status);
+CREATE INDEX IF NOT EXISTS quotes_job ON quotes(job_id, status);
+CREATE INDEX IF NOT EXISTS reviews_tradie ON reviews(tradie_id);
+CREATE INDEX IF NOT EXISTS jobs_customer ON jobs(customer_id, status);
+CREATE INDEX IF NOT EXISTS job_photos_job ON job_photos(job_id);
+CREATE INDEX IF NOT EXISTS work_notes_work ON work_notes(work_id);
+CREATE INDEX IF NOT EXISTS time_entries_work ON time_entries(work_id);
+CREATE INDEX IF NOT EXISTS work_costs_work ON work_costs(work_id);
+CREATE INDEX IF NOT EXISTS invoices_work ON invoices(work_id);
+CREATE INDEX IF NOT EXISTS invoice_lines_invoice ON invoice_lines(invoice_id);
+CREATE INDEX IF NOT EXISTS team_members_account ON team_members(account_id, status);
+CREATE INDEX IF NOT EXISTS payments_charge ON payments(stripe_charge_id);
+CREATE INDEX IF NOT EXISTS payments_intent ON payments(stripe_payment_intent);
+CREATE INDEX IF NOT EXISTS work_orders_assigned ON work_orders(assigned_to);
 `);
 
 module.exports = db;

@@ -173,13 +173,13 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   const stranger = browser();
   await signup(stranger, 'customer', 'Sam Stranger', 'sam@test.local');
   await stranger.get('/jobs');
-  await stranger.post(`/quotes/${quote.id}/accept`, {});
+  await stranger.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents) });
   assert.strictEqual(db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId).status, 'open');
 
   // Customer accepts. Contact details stay hidden on both sides until the job is paid.
   res = await customer.get(jobUrl);
   assert.match(res.text, /Terry Tiles/);
-  await customer.post(`/quotes/${quote.id}/accept`, {});
+  await customer.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents) });
   res = await customer.get(jobUrl);
   assert.doesNotMatch(res.text, /terry@test\.local/);
   res = await tradie.get(jobUrl);

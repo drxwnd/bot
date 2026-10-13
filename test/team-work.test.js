@@ -122,7 +122,7 @@ test('tradie business: owner, worker and job management', async () => {
   await owner.post(`/jobs/${jobId}/quotes`, { amount: '845', message: 'Regrout and replace the cracked tiles.' });
   const quoteId = id('SELECT id FROM quotes WHERE job_id = ?', jobId).id;
   await customer.get(`/jobs/${jobId}`);
-  await customer.post(`/quotes/${quoteId}/accept`);
+  await customer.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents) });
 
   // Not in Work until it's paid: the work order carries the customer's contact details.
   res = await owner.get('/work');
@@ -230,14 +230,14 @@ test('customer business: staff post jobs, managers accept', async () => {
 
   // A quote comes in.
   const tradieId = db.prepare("INSERT INTO users (email, password_hash, name, role) VALUES ('t@test.local', 'x', 'T', 'tradie')").run().lastInsertRowid;
-  db.prepare("INSERT INTO tradie_profiles (user_id, business_name, abn, trades, regions, status) VALUES (?, 'T Co', '51824753556', 'tiling', 'fremantle', 'approved')").run(tradieId);
+  db.prepare("INSERT INTO tradie_profiles (user_id, business_name, abn, trades, regions, status, insurance_expiry) VALUES (?, 'T Co', '51824753556', 'tiling', 'fremantle', 'approved', '2030-01-01')").run(tradieId);
   const quoteId = db.prepare("INSERT INTO quotes (job_id, tradie_id, amount_cents, message) VALUES (?, ?, 200000, 'Reseal all five ensuites')").run(jobId, tradieId).lastInsertRowid;
 
   // Staff can see the quote but not accept it.
   res = await staff.get(`/jobs/${jobId}`);
   assert.match(res.text, /T Co/);
   assert.match(res.text, /A manager accepts quotes/);
-  await staff.post(`/quotes/${quoteId}/accept`);
+  await staff.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents) });
   assert.strictEqual(id('SELECT status FROM jobs WHERE id = ?', jobId).status, 'open');
 
   // Promote to manager, then it works.
@@ -245,7 +245,7 @@ test('customer business: staff post jobs, managers accept', async () => {
   await owner.get('/team');
   await owner.post(`/team/${memberId}/role`, { role: 'manager' });
   await staff.get(`/jobs/${jobId}`);
-  await staff.post(`/quotes/${quoteId}/accept`);
+  await staff.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents) });
   assert.strictEqual(id('SELECT status FROM jobs WHERE id = ?', jobId).status, 'awarded');
 });
 

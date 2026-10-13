@@ -78,7 +78,9 @@ fly certs add www.tradebench.au
 The site won't start in production if something important is missing, like the session secret, Stripe keys or admin email. It prints exactly what's missing in `fly logs`.
 
 **Then:**
-- Sign up on the live site with your `ADMIN_EMAIL`. That account is the admin.
+- Sign up on the live site with the email you want as the admin (a normal customer sign-up). Then make it the admin:
+  `fly ssh console -C "node scripts/make-admin.js you@yourmail.com"`
+  Log in again and `/admin` appears. (For safety, signing up never makes anyone an admin on the live site.)
 - Open `/admin`. The **Set-up** panel shows green or amber for payments, webhook, email and fees.
 
 **Backups:**

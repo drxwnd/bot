@@ -149,7 +149,7 @@ test('job alerts, fees, contact details and reminders', async () => {
   assert.strictEqual(emailsTo('cleo@test.local', 'reminder_quotes').length, 1);
 
   await customer.get(`/jobs/${jobId}`);
-  await customer.post(`/quotes/${quote.id}/accept`);
+  await customer.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents) });
   page = await customer.get(`/jobs/${jobId}`);
   assert.match(page.text, /Pay \$204\.00 to lock it in/);
   assert.doesNotMatch(page.text, /tia@test\.local/, 'no contact details before payment');
@@ -199,7 +199,10 @@ test('password reset and unsubscribe links', async () => {
   await mailer.flush();
   assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM emails WHERE kind = 'password_reset'").get().n, 1);
 
-  const token = emailsTo('rhea@test.local', 'password_reset')[0].body_text.match(/\/reset\/([A-Za-z0-9_-]+)/)[1];
+  // The stored copy has the link blanked out; the email itself has it.
+  assert.match(emailsTo('rhea@test.local', 'password_reset')[0].body_text, /\/reset\/\[link removed\]/);
+  const sentReset = mailer.outbox.find((m) => m.to === 'rhea@test.local' && m.kind === 'password_reset');
+  const token = sentReset.text.match(/\/reset\/([A-Za-z0-9_-]+)/)[1];
   res = await anon.get(`/reset/${token}`);
   assert.strictEqual(res.status, 200);
   res = await anon.post(`/reset/${token}`, { password: 'brandnewpassword' });

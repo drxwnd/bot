@@ -304,6 +304,14 @@ const T = {
       button: { label: 'Open the job', href: url(`/jobs/${job.id}`) },
     }),
 
+  adminAlert: (admin, text) =>
+    layout({
+      subject: `Needs a look: ${text.slice(0, 70)}`,
+      heading: 'Something needs a look',
+      lines: [text],
+      button: { label: 'Open admin', href: url('/admin#payments') },
+    }),
+
   heldTooLong: (admin, job, payment, days) =>
     layout({
       subject: `Payment held ${days} days on job ${jobNo(job)}`,

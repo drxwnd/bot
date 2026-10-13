@@ -48,6 +48,18 @@ const config = {
   uploadDir: process.env.UPLOAD_DIR || path.join(root, 'uploads'),
 };
 
+// Money settings must be sensible numbers. A typo here would otherwise break every payment.
+for (const [name, value, max] of [
+  ['PLATFORM_FEE_PERCENT', config.feePercent, 30],
+  ['CUSTOMER_FEE_PERCENT', config.customerFeePercent, 10],
+  ['MIN_FEE_DOLLARS', config.minFeeCents / 100, 500],
+  ['MAX_QUOTE_DOLLARS', config.maxQuoteCents / 100, 10_000_000],
+]) {
+  if (!Number.isFinite(value) || value < 0 || value > max) {
+    throw new Error(`${name} must be a number between 0 and ${max} (it's set to "${value}")`);
+  }
+}
+
 config.paymentsEnabled = Boolean(config.stripeSecretKey);
 config.emailEnabled = Boolean(config.resendApiKey || config.postmarkToken);
 

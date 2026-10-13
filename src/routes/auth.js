@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
-const { flash } = require('../middleware');
+const { flash, logIn, logOutEverywhere, safeEqual } = require('../middleware');
+const { limit } = require('../ratelimit');
 const notify = require('../notify');
 const { unsubscribeToken } = require('../emails');
 
@@ -21,11 +22,24 @@ function throttled(key) {
   const rec = attempts.get(key) || { n: 0, until: 0, first: now };
   if (now - rec.first > 15 * 60 * 1000) Object.assign(rec, { n: 0, first: now });
   attempts.set(key, rec);
+  if (attempts.size > 10000) {
+    for (const [k, r] of attempts) if (now - r.first > 15 * 60 * 1000) attempts.delete(k);
+  }
   return rec;
 }
 
+// Only ever redirect to a path on this site. Backslashes and control characters are refused because
+// browsers treat "/\\evil.com" like "//evil.com".
 function safeNext(next) {
-  return typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+  if (typeof next !== 'string' || !next.startsWith('/') || next.startsWith('//')) return '/dashboard';
+  if (/[\\\x00-\x1f\x7f]/.test(next)) return '/dashboard';
+  try {
+    const u = new URL(next, config.siteUrl);
+    if (u.origin !== new URL(config.siteUrl).origin) return '/dashboard';
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return '/dashboard';
+  }
 }
 
 router.get('/login', (req, res) => {
@@ -33,7 +47,12 @@ router.get('/login', (req, res) => {
   res.render('pages/login', { title: 'Log in', next: req.query.next || '', email: '' });
 });
 
-router.post('/login', async (req, res) => {
+const loginLimit = limit('login', 40, 15 * 60 * 1000, (req, res) =>
+  res.render('pages/login', { title: 'Log in', next: req.body.next, email: '', error: 'Too many attempts. Wait 15 minutes and try again.' }),
+);
+const signupLimit = limit('signup', 12, 60 * 60 * 1000);
+
+router.post('/login', loginLimit, async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const password = String(req.body.password || '');
   const rec = throttled(`${req.ip}|${email}`);
@@ -60,7 +79,7 @@ router.post('/login', async (req, res) => {
   }
 
   attempts.delete(`${req.ip}|${email}`);
-  req.session.uid = user.id;
+  logIn(req, user.id);
   res.redirect(safeNext(req.body.next));
 });
 
@@ -70,7 +89,7 @@ router.get('/signup', (req, res) => {
   res.render('pages/signup', { title: as === 'tradie' ? 'Join as a tradie' : 'Create an account', as, values: {}, next: req.query.next || '' });
 });
 
-router.post('/signup', async (req, res) => {
+router.post('/signup', signupLimit, async (req, res) => {
   const as = req.body.as === 'tradie' ? 'tradie' : 'customer';
   const values = {
     name: String(req.body.name || '').trim(),
@@ -97,13 +116,16 @@ router.post('/signup', async (req, res) => {
     });
   }
 
-  const role = config.adminEmail && values.email === config.adminEmail ? 'admin' : as;
+  // Outside production, signing up with ADMIN_EMAIL makes you the admin, which keeps local testing
+  // simple. In production admins are made with `node scripts/make-admin.js`, so nobody can claim
+  // the admin account by signing up with that address first.
+  const role = !config.isProd && config.adminEmail && values.email === config.adminEmail ? 'admin' : as;
   const hash = await bcrypt.hash(password, 11);
   const company = role === 'tradie' ? null : values.company || null;
   const intent = req.session.intent || {};
   const customerType = role === 'customer' && intent.path === 'need' ? intent.who : null;
   const info = insertUser.run(values.email, hash, values.name, values.phone || null, role, company, customerType);
-  req.session.uid = Number(info.lastInsertRowid);
+  logIn(req, Number(info.lastInsertRowid));
 
   if (role === 'tradie') {
     flash(req, 'success', 'Account created. Now tell us about your business so we can check you over.');
@@ -129,7 +151,7 @@ router.get('/forgot', (req, res) => {
   res.render('pages/forgot', { title: 'Reset your password', email: '' });
 });
 
-router.post('/forgot', (req, res) => {
+router.post('/forgot', limit('forgot', 10, 60 * 60 * 1000), (req, res) => {
   res.locals.robots = 'noindex, nofollow';
   const email = String(req.body.email || '').trim().toLowerCase();
   const rec = throttled(`forgot|${req.ip}`);
@@ -151,6 +173,8 @@ router.post('/forgot', (req, res) => {
 function loadReset(req, res, next) {
   res.locals.robots = 'noindex, nofollow';
   req.reset = resets.find.get(hashToken(req.params.token));
+  // A login that's been disabled (a removed team member) can't be brought back with an old link.
+  if (req.reset && resets.user.get(req.reset.user_id).password_hash === '!') req.reset = null;
   if (!req.reset) {
     return res.status(404).render('pages/error', {
       title: 'Link expired',
@@ -174,7 +198,9 @@ router.post('/reset/:token', loadReset, async (req, res) => {
     resets.setPassword.run(hash, req.reset.user_id);
     resets.useAll.run(req.reset.user_id);
   })();
-  req.session.uid = req.reset.user_id;
+  // Anyone else logged in to this account (the reason for the reset, perhaps) is logged out.
+  logOutEverywhere(req.reset.user_id);
+  logIn(req, req.reset.user_id);
   flash(req, 'success', 'Password changed. You are logged in.');
   res.redirect('/dashboard');
 });
@@ -184,8 +210,7 @@ router.post('/reset/:token', loadReset, async (req, res) => {
 function checkUnsubscribe(u, t) {
   const id = Number(u);
   if (!Number.isInteger(id) || typeof t !== 'string') return null;
-  const expected = unsubscribeToken(id);
-  if (t.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(t), Buffer.from(expected))) return null;
+  if (!safeEqual(t, unsubscribeToken(id))) return null;
   return resets.user.get(id) || null;
 }
 
