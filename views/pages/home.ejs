@@ -2,7 +2,7 @@
 
 <section class="hero-photo">
   <div class="hero-media" aria-hidden="true">
-    <%- include('../partials/photo', { photo: 'heroCrane', cls: 'hero-img', eager: true }) %>
+    <%- include('../partials/photo', { photo: 'heroCrane', cls: 'hero-img', eager: true, sizes: '(max-width: 900px) 100vw, 128vw' }) %>
   </div>
   <div class="wrap hero-inner">
     <div class="hero-copy">
@@ -44,7 +44,7 @@
     <h2>What kind of work?</h2>
     <div class="tiles">
       <div class="tile">
-        <%- include('../partials/photo', { photo: 'tileHousing' }) %>
+        <%- include('../partials/photo', { photo: 'tileHousing', sizes: '(max-width: 900px) 100vw, 380px' }) %>
         <div class="tile-body">
           <h3><a class="tile-link" href="/housing">Housing</a></h3>
           <p>Repairs, maintenance and renovations for homeowners, landlords and property managers.</p>
@@ -52,7 +52,7 @@
         </div>
       </div>
       <div class="tile">
-        <%- include('../partials/photo', { photo: 'tileHotels' }) %>
+        <%- include('../partials/photo', { photo: 'tileHotels', sizes: '(max-width: 900px) 100vw, 380px' }) %>
         <div class="tile-body">
           <h3><a class="tile-link" href="/hotels">Hotels</a></h3>
           <p>Room repairs, air con, bathrooms and refurbishments, worked around your guests.</p>
@@ -60,7 +60,7 @@
         </div>
       </div>
       <div class="tile">
-        <%- include('../partials/photo', { photo: 'tileMining' }) %>
+        <%- include('../partials/photo', { photo: 'tileMining', sizes: '(max-width: 900px) 100vw, 380px' }) %>
         <div class="tile-body">
           <h3><a class="tile-link" href="/mining">Mining</a></h3>
           <p>Camp maintenance, workshop repairs and fabrication, with site requirements listed up front.</p>

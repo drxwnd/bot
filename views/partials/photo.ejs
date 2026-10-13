@@ -1,3 +1,10 @@
-<% const p = PHOTOS[photo]; const lazy = !(typeof eager !== 'undefined' && eager); %>
-<img class="<%= typeof cls !== 'undefined' ? cls : '' %>" src="/img/photos/<%= p.file %>" alt="<%= p.alt %>" width="<%= p.width %>" height="<%= p.height %>" <%- lazy ? 'loading="lazy"' : 'fetchpriority="high"' %> decoding="async">
+<%
+  // One of the site's own photos (src/photos.js). The browser picks the smallest WebP copy that
+  // fills the space (see scripts/build-images.js); the JPG is the fallback.
+  const p = PHOTOS[photo];
+  const lazy = !(typeof eager !== 'undefined' && eager);
+  const base = '/img/photos/' + p.file.replace(/\.jpg$/, '');
+  const set = [640, 1280].filter((w) => w < p.width).map((w) => `${base}-${w}.webp ${w}w`).concat(`${base}.webp ${p.width}w`).join(', ');
+%>
+<img class="<%= typeof cls !== 'undefined' ? cls : '' %>" src="/img/photos/<%= p.file %>" srcset="<%= set %>" sizes="<%= typeof sizes !== 'undefined' ? sizes : '100vw' %>" alt="<%= p.alt %>" width="<%= p.width %>" height="<%= p.height %>" <%- lazy ? 'loading="lazy"' : 'fetchpriority="high"' %> decoding="async">
 <% if (p.attribution) { %><a class="photo-tag" href="<%= p.source %>" rel="nofollow noopener" target="_blank">Photo: <%= p.creator %>, <%= p.license %></a><% } %>
