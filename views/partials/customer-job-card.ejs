@@ -1,0 +1,18 @@
+<%
+  const stage = { open: 1, awarded: 2, paid: 3, completed: 4, cancelled: 0 }[j.status];
+  const next = j.status === 'open' ? (j.quote_count ? `${j.quote_count} quote${j.quote_count === 1 ? '' : 's'}${j.lowest_quote ? ', from ' + money(j.lowest_quote) : ''}` : 'Waiting for quotes')
+    : j.status === 'awarded' ? `Pay ${j.tradie_business} to lock it in`
+    : j.status === 'paid' ? `${j.tradie_business} is on it. Money held.`
+    : j.status === 'completed' ? (j.reviewed ? `Done by ${j.tradie_business}` : `Done. Leave ${j.tradie_business} a review`)
+    : 'Closed';
+%>
+<a class="cj-card <%= j.status %>" href="/jobs/<%= j.id %>">
+  <span class="cj-photo" aria-hidden="true"><% if (j.photo) { %><img src="/uploads/<%= thumb(j.photo) %>" alt="" loading="lazy"><% } else { %><span><%= tradeName[j.trade].slice(0, 1) %></span><% } %></span>
+  <span class="cj-body">
+    <span class="cj-top"><span class="tag <%= j.status %>"><%= STATUS_LABEL[j.status] %></span><span class="small muted"><%= ago(j.created_at) %></span></span>
+    <strong><%= j.title %></strong>
+    <span class="small muted"><%= tradeName[j.trade] %> · <%= j.suburb %></span>
+    <span class="cj-next"><%= next %></span>
+    <% if (stage) { %><span class="cj-stages" aria-hidden="true"><% for (let i = 1; i <= 4; i++) { %><i class="<%= i <= stage ? 'on' : '' %>"></i><% } %></span><% } %>
+  </span>
+</a>

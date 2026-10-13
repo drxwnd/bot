@@ -62,10 +62,11 @@ function browser() {
   return {
     get: (u) => req('GET', u),
     post: (u, b = {}) => req('POST', u, b),
-    form: (u, fields) => {
+    form: (u, fields, files = []) => {
       const fd = new FormData();
       fd.set('_csrf', csrf);
       for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+      for (const [k, buf, name] of files) fd.append(k, new Blob([buf], { type: 'image/jpeg' }), name);
       return req('POST', u, fd);
     },
   };
@@ -183,6 +184,41 @@ test('job alerts, fees, contact details and reminders', async () => {
   // Admin sees both fees as earnings.
   page = await admin.get('/admin');
   assert.match(page.text, /Fees earned<\/span><b>\$19\.00/);
+
+  // The customer reviews, the tradie replies, and both show on the public profile.
+  await customer.get(`/jobs/${jobId}`);
+  await customer.post(`/jobs/${jobId}/review`, { rating: '5', comment: 'Quick and tidy.' });
+  const review = one('SELECT * FROM reviews WHERE job_id = ?', jobId);
+  assert.ok(review, 'review saved');
+  await tiler.b.get('/dashboard/reviews');
+  await tiler.b.post(`/dashboard/reviews/${review.id}/reply`, { reply: 'Thanks Cleo, happy to help.' });
+  page = await browser().get(`/tradies/${tiler.id}`);
+  assert.match(page.text, /Quick and tidy\./);
+  assert.match(page.text, /Thanks Cleo, happy to help\./);
+
+  // Logo and work photos go up and appear on the profile.
+  const sharp = require('sharp');
+  const img = await sharp({ create: { width: 900, height: 700, channels: 3, background: '#556677' } }).jpeg().toBuffer();
+  await tiler.b.get('/dashboard/profile/photos');
+  await tiler.b.form('/dashboard/profile/photos', { kind: 'work', caption: 'Kitchen splashback' }, [['photos', img, 'a.jpg'], ['photos', img, 'b.jpg']]);
+  await tiler.b.get('/dashboard/profile/photos');
+  await tiler.b.form('/dashboard/profile/photos', { kind: 'logo' }, [['photos', img, 'logo.jpg']]);
+  assert.strictEqual(one('SELECT COUNT(*) AS n FROM tradie_photos WHERE user_id = ?', tiler.id).n, 2);
+  assert.ok(one('SELECT logo FROM tradie_profiles WHERE user_id = ?', tiler.id).logo);
+  page = await browser().get(`/tradies/${tiler.id}`);
+  assert.match(page.text, /Recent work/);
+  assert.match(page.text, /Kitchen splashback/);
+  assert.match(page.text, /logo-img/);
+
+  // Every dashboard page loads for both sides.
+  for (const url of ['/dashboard', '/dashboard/jobs', '/dashboard/quotes', '/dashboard/earnings', '/dashboard/reviews', '/dashboard/account', '/dashboard/profile/photos']) {
+    assert.strictEqual((await tiler.b.get(url)).status, 200, `tradie ${url}`);
+  }
+  for (const url of ['/dashboard', '/dashboard/jobs', '/dashboard/payments', '/dashboard/reviews', '/dashboard/account']) {
+    assert.strictEqual((await customer.get(url)).status, 200, `customer ${url}`);
+  }
+  const csv = await tiler.b.get('/dashboard/earnings.csv');
+  assert.match(csv.text, /Replace two cracked tiles/);
 });
 
 test('password reset and unsubscribe links', async () => {

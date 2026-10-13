@@ -197,7 +197,7 @@
       <% } %>
       <% if (photos.length) { %>
         <div class="photos">
-          <% photos.forEach(p => { %><a href="/uploads/<%= p.filename %>" target="_blank" rel="noopener"><img src="/uploads/<%= p.filename %>" alt="Photo of the job" loading="lazy"></a><% }) %>
+          <% photos.forEach(p => { %><a href="/uploads/<%= p.filename %>" target="_blank" rel="noopener"><img src="/uploads/<%= thumb(p.filename) %>" alt="Photo of the job" loading="lazy"></a><% }) %>
         </div>
       <% } %>
 

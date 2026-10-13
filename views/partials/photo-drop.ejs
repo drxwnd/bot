@@ -1,0 +1,9 @@
+<%# Photo picker with previews. Works as a plain file input without JavaScript. %>
+<label class="drop" for="<%= id %>">
+  <input id="<%= id %>" name="<%= name %>" type="file" accept="image/*" <%= max > 1 ? 'multiple' : '' %> data-preview="<%= id %>-preview" data-max="<%= max %>">
+  <span class="drop-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 17l-5-5-8 8"/></svg>
+  </span>
+  <span class="drop-text"><strong><%= label %></strong><span><%= hint %></span></span>
+</label>
+<div class="drop-preview" id="<%= id %>-preview"></div>

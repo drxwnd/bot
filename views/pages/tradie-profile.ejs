@@ -2,7 +2,7 @@
 <div class="wrap">
   <div class="page-head">
     <div class="profile-head">
-      <div class="initials"><%= tradie.business_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') %></div>
+      <% if (tradie.logo) { %><img class="initials logo-img" src="/uploads/<%= thumb(tradie.logo) %>" alt="<%= tradie.business_name %> logo" width="80" height="80"><% } else { %><div class="initials"><%= tradie.business_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') %></div><% } %>
       <div>
         <h1 style="margin-bottom:6px"><%= tradie.business_name %></h1>
         <div class="muted">
@@ -27,6 +27,16 @@
         <hr>
       <% } %>
 
+      <% if (photos.length) { %>
+        <h2 style="font-size:1.4rem">Recent work</h2>
+        <div class="photo-grid public">
+          <% photos.forEach(p => { %>
+            <figure><a href="/uploads/<%= p.filename %>" target="_blank" rel="noopener"><img src="/uploads/<%= thumb(p.filename) %>" alt="<%= p.caption || 'Work by ' + tradie.business_name %>" loading="lazy"></a><% if (p.caption) { %><figcaption><span><%= p.caption %></span></figcaption><% } %></figure>
+          <% }) %>
+        </div>
+        <hr>
+      <% } %>
+
       <h2 style="font-size:1.4rem">Reviews</h2>
       <% if (!reviews.length) { %>
         <div class="empty">No reviews yet. Reviews can only be left by customers who've paid for a job through <%= siteName %>.</div>
@@ -37,6 +47,7 @@
           <strong><%= r.title %></strong>
           <div class="small muted"><%= r.customer_name.split(' ')[0] %>, <%= r.suburb %> &middot; <%= shortDate(r.created_at) %></div>
           <% if (r.comment) { %><p class="prose" style="margin:10px 0 0"><%= r.comment %></p><% } %>
+          <% if (r.reply) { %><div class="reply"><strong><%= tradie.business_name %> replied</strong><p><%= r.reply %></p></div><% } %>
         </div>
       <% }) %>
     </div>

@@ -1,0 +1,20 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head"><h1>Your quotes</h1></div>
+<nav class="tabs" aria-label="Filter quotes">
+  <% [['all', 'All', quotes.length], ['open', 'Waiting', quotes.filter(x => x.state.key === 'open').length], ['won', 'Won', won.length], ['lost', 'Not won', quotes.filter(x => x.state.key === 'lost').length]].forEach(([key, label, n]) => { %>
+    <a href="/dashboard/quotes<%= key === 'all' ? '' : '?tab=' + key %>" class="<%= tab === key ? 'on' : '' %>"><%= label %> <span><%= n %></span></a>
+  <% }) %>
+</nav>
+<% if (!shown.length) { %>
+  <div class="card empty-card"><strong>Nothing here yet</strong><p class="muted"><a href="/dashboard/jobs">Find a job</a> to quote on.</p></div>
+<% } else { %>
+  <div class="list-cards">
+    <% shown.forEach(qt => { %>
+      <a class="list-card" href="/jobs/<%= qt.job_id %>">
+        <span class="lc-main"><strong><%= qt.title %></strong><small><%= tradeName[qt.trade] %> · <%= qt.suburb %> · sent <%= ago(qt.created_at) %></small></span>
+        <span class="lc-side"><b class="mono"><%= money(qt.amount_cents) %></b><span class="tag <%= qt.state.cls %>"><%= qt.state.label %></span></span>
+      </a>
+    <% }) %>
+  </div>
+<% } %>
+<%- include('../partials/dash-end') %>

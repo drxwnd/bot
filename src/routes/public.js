@@ -94,7 +94,7 @@ const tradieById = db.prepare(`
   FROM users u JOIN tradie_profiles p ON p.user_id = u.id
   WHERE u.id = ? AND p.status = 'approved'`);
 const reviewsFor = db.prepare(`
-  SELECT r.rating, r.comment, r.created_at, u.name AS customer_name, j.title, j.suburb
+  SELECT r.rating, r.comment, r.created_at, r.reply, u.name AS customer_name, j.title, j.suburb
   FROM reviews r JOIN users u ON u.id = r.customer_id JOIN jobs j ON j.id = r.job_id
   WHERE r.tradie_id = ? ORDER BY r.created_at DESC`);
 const completedCount = db.prepare(`
@@ -105,6 +105,7 @@ router.get('/tradies/:id', (req, res, next) => {
   const tradie = tradieById.get(Number(req.params.id));
   if (!tradie) return next();
   const reviews = reviewsFor.all(tradie.id);
+  const photos = db.prepare('SELECT filename, caption FROM tradie_photos WHERE user_id = ? ORDER BY id DESC LIMIT 24').all(tradie.id);
   const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : null;
   const trades = tradie.trades.split(',').map((s) => C.tradeName[s]).filter(Boolean);
   const areas = tradie.regions.split(',').map((s) => C.regionName[s]).filter(Boolean);
@@ -128,6 +129,7 @@ router.get('/tradies/:id', (req, res, next) => {
     }));
   }
   res.render('pages/tradie-profile', {
+    photos,
     title: `${tradie.business_name}: ${trades.slice(0, 2).join(' and ')}`,
     description: seo.truncate(`${tradie.business_name}, ${trades.join(', ').toLowerCase()} covering ${areas.slice(0, 3).join(', ')}. ${avg ? `Rated ${avg.toFixed(1)} from ${reviews.length} reviews. ` : ''}ABN and insurance checked.`),
     jsonld: [business],

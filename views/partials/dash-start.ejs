@@ -1,0 +1,38 @@
+<%- include('head') %>
+<%
+  // Side menu for the dashboard. Each page passes dashNav to mark where you are.
+  const items = [];
+  if (user.role === 'tradie') {
+    items.push({ key: 'overview', href: '/dashboard', label: 'Overview' });
+    items.push({ key: 'jobs', href: '/dashboard/jobs', label: 'Find jobs' });
+    items.push({ key: 'quotes', href: '/dashboard/quotes', label: 'Quotes' });
+    items.push({ key: 'work', href: '/work', label: 'Work' });
+    if (can('money')) items.push({ key: 'earnings', href: '/dashboard/earnings', label: 'Earnings' });
+    items.push({ key: 'reviews', href: '/dashboard/reviews', label: 'Reviews' });
+    if (can('profile')) items.push({ key: 'profile', href: '/dashboard/profile', label: 'Business profile' });
+    if (can('profile') && user.profile) items.push({ key: 'photos', href: '/dashboard/profile/photos', label: 'Logo and photos' });
+    if (can('payouts')) items.push({ key: 'payouts', href: '/dashboard/payouts', label: 'Payouts' });
+  } else {
+    items.push({ key: 'overview', href: '/dashboard', label: 'Overview' });
+    items.push({ key: 'jobs', href: '/dashboard/jobs', label: 'Jobs' });
+    items.push({ key: 'payments', href: '/dashboard/payments', label: 'Payments' });
+    items.push({ key: 'reviews', href: '/dashboard/reviews', label: 'Reviews' });
+  }
+  if (can('team')) items.push({ key: 'team', href: '/team', label: 'Team' });
+  items.push({ key: 'account', href: '/dashboard/account', label: 'Account' });
+  const here = typeof dashNav !== 'undefined' ? dashNav : '';
+  const who = user.role === 'tradie' ? (user.profile ? user.profile.business_name : user.name) : (account.owner.company || account.owner.name);
+%>
+<div class="dash">
+  <aside class="dash-side">
+    <div class="dash-who">
+      <span class="dash-avatar" aria-hidden="true"><%= who.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') %></span>
+      <span><strong><%= who %></strong><% if (account.role !== 'owner') { %><small><%= account.roleName %></small><% } %></span>
+    </div>
+    <nav class="dash-nav" aria-label="Dashboard">
+      <% items.forEach(i => { %><a href="<%= i.href %>" class="<%= i.key === here ? 'on' : '' %>" <%- i.key === here ? 'aria-current="page"' : '' %>><%= i.label %></a><% }) %>
+    </nav>
+    <% if (user.role === 'customer' && can('post')) { %><a class="btn accent block dash-cta" href="/jobs/new">Post a job</a><% } %>
+    <% if (user.role === 'tradie' && user.profile && user.profile.status === 'approved') { %><a class="dash-public" href="/tradies/<%= account.ownerId %>">View your public profile</a><% } %>
+  </aside>
+  <div class="dash-main">

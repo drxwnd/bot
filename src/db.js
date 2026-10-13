@@ -264,6 +264,21 @@ CREATE TABLE IF NOT EXISTS stripe_events (
 );
 `);
 
+// Tradies can reply to reviews; and add a logo and photos of their work to their profile.
+addColumn('reviews', 'reply', 'TEXT');
+addColumn('reviews', 'reply_at', 'TEXT');
+addColumn('tradie_profiles', 'logo', 'TEXT');
+db.exec(`
+CREATE TABLE IF NOT EXISTS tradie_photos (
+  id         INTEGER PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  filename   TEXT NOT NULL,
+  caption    TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS tradie_photos_user ON tradie_photos(user_id);
+`);
+
 // Indexes for the lookups the site does on every page.
 db.exec(`
 CREATE INDEX IF NOT EXISTS quotes_tradie ON quotes(tradie_id, status);

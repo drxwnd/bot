@@ -1,0 +1,46 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head">
+  <h1>Earnings</h1>
+  <a class="btn ghost" href="/dashboard/earnings.csv">Download for your accountant (CSV)</a>
+</div>
+<div class="kpis">
+  <div class="kpi"><span>Paid to you, all time</span><b><%= money(earned.paid_out) %></b></div>
+  <div class="kpi"><span>This month</span><b><%= money(earned.this_month) %></b></div>
+  <div class="kpi"><span>Coming to you</span><b><%= money(earned.held) %></b><small>Held until customers sign off</small></div>
+  <div class="kpi"><span>Fees paid</span><b><%= money(earned.fees) %></b><small><%= feeLabel %> of each job</small></div>
+</div>
+<section class="card">
+  <div class="card-head"><h2>Paid to you each month</h2></div>
+  <%- include('../partials/bar-chart', { months, label: 'Money paid to you each month for the last twelve months' }) %>
+  <details class="table-toggle">
+    <summary>Show as a table</summary>
+    <table>
+      <thead><tr><th>Month</th><th class="num">Jobs</th><th class="num">Paid to you</th></tr></thead>
+      <tbody><% months.slice().reverse().forEach(m => { %><tr><td><%= m.long %></td><td class="num"><%= m.jobs %></td><td class="num"><%= money(m.cents) %></td></tr><% }) %></tbody>
+    </table>
+  </details>
+</section>
+<section class="card">
+  <div class="card-head"><h2>Payments</h2></div>
+  <% if (!payouts.length) { %>
+    <p class="muted small" style="margin:0">When a customer pays for one of your jobs, it shows here.</p>
+  <% } else { %>
+    <div class="table-wrap flat">
+      <table>
+        <thead><tr><th>Job</th><th>Status</th><th class="num">Quote</th><th class="num">Fee</th><th class="num">To you</th></tr></thead>
+        <tbody>
+          <% payouts.forEach(p => { %>
+            <tr>
+              <td><a href="/jobs/<%= p.job_id %>"><%= p.title %></a><br><span class="small muted"><%= p.suburb %> · <%= p.status === 'released' ? 'paid out ' + shortDate(p.released_at) : p.status === 'held' ? 'paid in ' + shortDate(p.paid_at) : 'refunded' %></span></td>
+              <td><span class="tag <%= p.status %>"><%= p.status === 'held' ? 'held for you' : p.status === 'released' ? 'paid out' : p.status %></span></td>
+              <td class="num"><%= money(p.amount_cents) %></td>
+              <td class="num">−<%= money(p.fee_cents) %></td>
+              <td class="num"><strong><%= money(p.amount_cents - p.fee_cents) %></strong></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+<%- include('../partials/dash-end') %>

@@ -1,41 +1,52 @@
-<%- include('../partials/head') %>
-<div class="wrap">
-  <div class="page-head" style="display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap">
-    <div>
-      <% if (account.owner.company) { %><span class="eyebrow"><%= account.owner.company %><% if (account.role !== 'owner') { %> · <%= account.roleName %><% } %></span><% } %>
-      <h1>Your jobs</h1>
-    </div>
-    <div style="display:flex;gap:10px">
-      <% if (can('team')) { %><a class="btn ghost" href="/team">Team</a><% } %>
-      <a class="btn accent" href="/jobs/new">Post a new job</a>
-    </div>
+<%- include('../partials/dash-start') %>
+<div class="dash-head">
+  <div>
+    <p class="eyebrow">Hi <%= user.name.split(' ')[0] %></p>
+    <h1>Overview</h1>
+  </div>
+  <% if (can('post')) { %><a class="btn accent" href="/jobs/new">Post a job</a><% } %>
+</div>
+
+<% if (!jobs.length) { %>
+  <section class="card welcome">
+    <h2>Get your first quotes</h2>
+    <ol class="welcome-steps">
+      <li><strong>Post the job.</strong> Two minutes. Add a photo or two and say what needs doing.</li>
+      <li><strong>Compare quotes.</strong> Checked local tradies send you a fixed price. Free, and no obligation.</li>
+      <li><strong>Pay when you're ready.</strong> We hold the money and only release it when you say the job's done.</li>
+    </ol>
+    <% if (can('post')) { %><a class="btn accent big" href="/jobs/new">Post your first job</a><% } %>
+  </section>
+<% } else { %>
+  <div class="kpis">
+    <div class="kpi"><span>Open jobs</span><b><%= stats.open %></b></div>
+    <div class="kpi"><span>Quotes to look at</span><b><%= stats.quotes %></b></div>
+    <div class="kpi"><span>Money held</span><b><%= money(stats.held) %></b><small>Until you sign off</small></div>
+    <div class="kpi"><span>Jobs done through us</span><b><%= jobs.filter(j => j.status === 'completed').length %></b><small><%= money(stats.spent) %> in total</small></div>
   </div>
 
-  <div class="page" style="padding-top:0">
-    <% if (!jobs.length) { %>
-      <div class="empty">
-        <strong>You haven't posted any jobs yet.</strong>
-        <p style="margin:6px 0 18px">It takes a couple of minutes and costs nothing.</p>
-        <a class="btn" href="/jobs/new">Post your first job</a>
-      </div>
+  <section class="card">
+    <div class="card-head"><h2>Needs you</h2></div>
+    <% if (!actions.length) { %>
+      <p class="muted small" style="margin:0">Nothing waiting on you right now. We'll email you when quotes come in.</p>
     <% } else { %>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Job</th><th>Suburb</th><th>Status</th><th class="num">Quotes</th><th>Posted</th></tr></thead>
-          <tbody>
-            <% jobs.forEach(j => { %>
-              <tr>
-                <td><span class="mono muted">#<%= String(j.id).padStart(4, '0') %></span>&nbsp; <a href="/jobs/<%= j.id %>"><%= j.title %></a></td>
-                <td><%= j.suburb %></td>
-                <td><span class="tag <%= j.status %>"><%= STATUS_LABEL[j.status] %></span></td>
-                <td class="num"><%= j.quote_count %></td>
-                <td class="muted"><%= ago(j.created_at) %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+      <ul class="action-list">
+        <% actions.forEach(a => { %>
+          <li>
+            <span class="dot <%= a.kind === 'compare' || a.kind === 'pay' ? 'go' : 'wait' %>" aria-hidden="true"></span>
+            <span><strong><%= a.job.title %></strong><small><%= a.text %></small></span>
+            <a class="btn small <%= a.kind === 'compare' || a.kind === 'pay' ? 'accent' : 'ghost' %>" href="<%= a.href %>"><%= a.cta %></a>
+          </li>
+        <% }) %>
+      </ul>
     <% } %>
-  </div>
-</div>
-<%- include('../partials/foot') %>
+  </section>
+
+  <section>
+    <div class="card-head"><h2>Recent jobs</h2><a href="/dashboard/jobs">All jobs</a></div>
+    <div class="cj-grid">
+      <% jobs.slice(0, 6).forEach(j => { %><%- include('../partials/customer-job-card', { j }) %><% }) %>
+    </div>
+  </section>
+<% } %>
+<%- include('../partials/dash-end') %>

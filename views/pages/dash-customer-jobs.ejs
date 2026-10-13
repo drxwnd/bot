@@ -1,0 +1,18 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head">
+  <h1>Your jobs</h1>
+  <% if (can('post')) { %><a class="btn accent" href="/jobs/new">Post a job</a><% } %>
+</div>
+<nav class="tabs" aria-label="Filter jobs">
+  <% [['all', 'All', jobs.length], ['active', 'Active', jobs.filter(j => ['open', 'awarded', 'paid'].includes(j.status)).length], ['done', 'Done', jobs.filter(j => j.status === 'completed').length], ['closed', 'Closed', jobs.filter(j => j.status === 'cancelled').length]].forEach(([key, label, n]) => { %>
+    <a href="/dashboard/jobs<%= key === 'all' ? '' : '?tab=' + key %>" class="<%= tab === key ? 'on' : '' %>"><%= label %> <span><%= n %></span></a>
+  <% }) %>
+</nav>
+<% if (!shown.length) { %>
+  <div class="card empty-card"><strong><%= jobs.length ? 'Nothing in this list' : "You haven't posted a job yet" %></strong><% if (!jobs.length && can('post')) { %><p><a class="btn" href="/jobs/new">Post your first job</a></p><% } %></div>
+<% } else { %>
+  <div class="cj-grid">
+    <% shown.forEach(j => { %><%- include('../partials/customer-job-card', { j }) %><% }) %>
+  </div>
+<% } %>
+<%- include('../partials/dash-end') %>

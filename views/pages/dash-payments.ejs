@@ -1,0 +1,29 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head"><h1>Payments</h1></div>
+<div class="kpis two">
+  <div class="kpi"><span>Held for you</span><b><%= money(totals.held) %></b><small>Released only when you say the job's done</small></div>
+  <div class="kpi"><span>Paid to tradies</span><b><%= money(totals.spent) %></b></div>
+</div>
+<section class="card">
+  <% if (!payments.length) { %>
+    <p class="muted small" style="margin:0">When you pay for a job, it shows here. Your money is held until you sign the job off.</p>
+  <% } else { %>
+    <div class="table-wrap flat">
+      <table>
+        <thead><tr><th>Job</th><th>Tradie</th><th>Status</th><th class="num">Paid</th></tr></thead>
+        <tbody>
+          <% payments.forEach(p => { %>
+            <tr>
+              <td><a href="/jobs/<%= p.job_id %>"><%= p.title %></a><br><span class="small muted"><%= p.suburb %> · paid <%= shortDate(p.paid_at) %></span></td>
+              <td><%= p.business_name %></td>
+              <td><span class="tag <%= p.status %>"><%= p.status === 'held' ? 'held' : p.status === 'released' ? 'released to tradie' : p.status %></span></td>
+              <td class="num"><strong><%= money(p.amount_cents + p.customer_fee_cents) %></strong><% if (p.customer_fee_cents) { %><br><span class="small muted">inc. <%= money(p.customer_fee_cents) %> fee</span><% } %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+<p class="small muted">Something wrong with a job you've paid for? Don't release the payment. Email <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a> and we'll help sort it out.</p>
+<%- include('../partials/dash-end') %>

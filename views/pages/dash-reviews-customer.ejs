@@ -1,0 +1,25 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head"><h1>Reviews</h1></div>
+<% if (toReview.length) { %>
+  <section class="card">
+    <div class="card-head"><h2>Waiting for your review</h2></div>
+    <ul class="action-list">
+      <% toReview.forEach(j => { %>
+        <li><span class="dot go" aria-hidden="true"></span><span><strong><%= j.title %></strong><small>How did <%= j.tradie_business %> go?</small></span><a class="btn small accent" href="/jobs/<%= j.id %>#review">Leave a review</a></li>
+      <% }) %>
+    </ul>
+  </section>
+<% } %>
+<% if (!reviews.length && !toReview.length) { %>
+  <div class="card empty-card"><strong>No reviews yet</strong><p class="muted">Once a job's done and you've released the payment, you can review the tradie. It helps the next person choose.</p></div>
+<% } %>
+<% reviews.forEach(r => { %>
+  <article class="card review-card">
+    <div class="rc-top"><span><span class="star"><%= '★'.repeat(r.rating) %></span><span class="star off"><%= '★'.repeat(5 - r.rating) %></span></span><span class="small muted"><%= shortDate(r.created_at) %></span></div>
+    <strong><%= r.business_name %></strong>
+    <div class="small muted"><%= r.title %></div>
+    <% if (r.comment) { %><p class="prose"><%= r.comment %></p><% } %>
+    <% if (r.reply) { %><div class="reply"><strong><%= r.business_name %> replied</strong><p><%= r.reply %></p></div><% } %>
+  </article>
+<% }) %>
+<%- include('../partials/dash-end') %>

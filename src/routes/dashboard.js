@@ -4,33 +4,13 @@ const C = require('../constants');
 const payments = require('../payments');
 const notify = require('../notify');
 const { validAbn, list } = require('../helpers');
-const { flash, requireLogin, requireRole, requireCan } = require('../middleware');
+const { flash, requireLogin, requireRole, requireCan, verifyCsrf } = require('../middleware');
+const uploads = require('../uploads');
 const { can } = require('../permissions');
 
 const router = express.Router();
 
 const q = {
-  customerJobs: db.prepare(`
-    SELECT j.*,
-      (SELECT COUNT(*) FROM quotes WHERE job_id = j.id AND status != 'withdrawn') AS quote_count
-    FROM jobs j WHERE j.customer_id = ? ORDER BY j.status = 'cancelled', j.created_at DESC`),
-  tradieQuotes: db.prepare(`
-    SELECT q.*, j.title, j.suburb, j.status AS job_status, j.accepted_quote_id,
-      p.status AS payment_status
-    FROM quotes q JOIN jobs j ON j.id = q.job_id LEFT JOIN payments p ON p.job_id = j.id
-    WHERE q.tradie_id = ? AND q.status != 'withdrawn' ORDER BY q.created_at DESC`),
-  matchingJobs: db.prepare(`
-    SELECT id, sector, title, trade, suburb, region, budget, created_at FROM jobs
-    WHERE status = 'open'
-      AND (',' || @trades || ',') LIKE ('%,' || trade || ',%')
-      AND (',' || @regions || ',') LIKE ('%,' || region || ',%')
-      AND (',' || @sectors || ',') LIKE ('%,' || sector || ',%')
-      AND id NOT IN (SELECT job_id FROM quotes WHERE tradie_id = @uid)
-    ORDER BY created_at DESC LIMIT 10`),
-  earnings: db.prepare(`
-    SELECT COALESCE(SUM(p.amount_cents - p.fee_cents), 0) AS paid_out
-    FROM payments p JOIN quotes q ON q.id = p.quote_id
-    WHERE q.tradie_id = ? AND p.status = 'released'`),
   upsertProfile: db.prepare(`
     INSERT INTO tradie_profiles (user_id, business_name, abn, sectors, trades, regions, licence_no, tickets, insurer, insurance_expiry, years_trading, bio)
     VALUES (@user_id, @business_name, @abn, @sectors, @trades, @regions, @licence_no, @tickets, @insurer, @insurance_expiry, @years_trading, @bio)
@@ -57,33 +37,6 @@ function needsRecheck(before, values) {
   );
 }
 
-router.get('/dashboard', requireLogin, (req, res) => {
-  const user = req.user;
-  if (user.role === 'admin') return res.redirect('/admin');
-
-  const accountId = req.account.ownerId;
-  if (user.role === 'customer') {
-    return res.render('pages/dash-customer', { title: 'Your jobs', jobs: q.customerJobs.all(accountId) });
-  }
-
-  // Workers only see the jobs assigned to them.
-  if (!can(req, 'quote')) return res.redirect('/work');
-
-  const profile = user.profile;
-  res.render('pages/dash-tradie', {
-    title: 'Dashboard',
-    profile,
-    quotes: q.tradieQuotes.all(accountId),
-    matches:
-      profile && profile.status === 'approved'
-        ? q.matchingJobs.all({ trades: profile.trades, regions: profile.regions, sectors: profile.sectors, uid: accountId })
-        : [],
-    paidOut: q.earnings.get(accountId).paid_out,
-  });
-});
-
-// ---- Tradie business profile ----
-
 // A new tradie's first visit uses what they told the get-started quiz.
 function prefillFromQuiz(intent, base) {
   const fromQuiz = intent && intent.path === 'tradie' ? intent : {};
@@ -94,6 +47,84 @@ function prefillFromQuiz(intent, base) {
     regions: fromQuiz.regions || [],
   };
 }
+
+// ---- Logo and photos of past work, shown on the public profile ----
+
+const MAX_WORK_PHOTOS = 24;
+const photoQ = {
+  list: db.prepare('SELECT * FROM tradie_photos WHERE user_id = ? ORDER BY id DESC'),
+  count: db.prepare('SELECT COUNT(*) AS n FROM tradie_photos WHERE user_id = ?'),
+  add: db.prepare('INSERT INTO tradie_photos (user_id, filename, caption) VALUES (?, ?, ?)'),
+  one: db.prepare('SELECT * FROM tradie_photos WHERE id = ? AND user_id = ?'),
+  remove: db.prepare('DELETE FROM tradie_photos WHERE id = ?'),
+  setLogo: db.prepare('UPDATE tradie_profiles SET logo = ? WHERE user_id = ?'),
+};
+
+router.get('/dashboard/profile/photos', requireRole('tradie'), requireCan('profile'), (req, res) => {
+  if (!req.user.profile) return res.redirect('/dashboard/profile');
+  res.render('pages/profile-photos', {
+    title: 'Logo and photos',
+    dashNav: 'photos',
+    profile: req.user.profile,
+    photos: photoQ.list.all(req.account.ownerId),
+    max: MAX_WORK_PHOTOS,
+  });
+});
+
+router.post(
+  '/dashboard/profile/photos',
+  requireRole('tradie'),
+  requireCan('profile'),
+  uploads.receive('photos', 8),
+  verifyCsrf,
+  async (req, res, next) => {
+    const id = req.account.ownerId;
+    if (!req.user.profile) return res.redirect('/dashboard/profile');
+    if (req.uploadError) {
+      flash(req, 'error', req.uploadError);
+      return res.redirect('/dashboard/profile/photos');
+    }
+    try {
+      if (req.body.kind === 'logo') {
+        if (!req.files || !req.files.length) throw Object.assign(new Error(), { friendly: 'Choose an image for your logo.' });
+        const name = await uploads.save(req.files[0], { maxSide: 600 });
+        if (req.user.profile.logo) uploads.remove(req.user.profile.logo);
+        photoQ.setLogo.run(name, id);
+        flash(req, 'success', 'Logo updated.');
+      } else {
+        const room = MAX_WORK_PHOTOS - photoQ.count.get(id).n;
+        const files = (req.files || []).slice(0, Math.max(0, room));
+        if (!files.length) throw Object.assign(new Error(), { friendly: room <= 0 ? `You can have up to ${MAX_WORK_PHOTOS} photos. Remove some first.` : 'Choose some photos to add.' });
+        const caption = String(req.body.caption || '').trim().slice(0, 120) || null;
+        const { saved, skipped } = await uploads.saveAll(files);
+        for (const f of saved) photoQ.add.run(id, f, caption);
+        flash(req, skipped ? 'info' : 'success', skipped ? uploads.UNREADABLE : `${saved.length} photo${saved.length === 1 ? '' : 's'} added to your profile.`);
+      }
+    } catch (err) {
+      if (!err.friendly) return next(err);
+      flash(req, 'error', err.friendly);
+    }
+    res.redirect('/dashboard/profile/photos');
+  },
+);
+
+router.post('/dashboard/profile/photos/:id/delete', requireRole('tradie'), requireCan('profile'), (req, res) => {
+  const photo = photoQ.one.get(Number(req.params.id), req.account.ownerId);
+  if (photo) {
+    photoQ.remove.run(photo.id);
+    uploads.remove(photo.filename);
+    flash(req, 'success', 'Photo removed.');
+  }
+  res.redirect('/dashboard/profile/photos');
+});
+
+router.post('/dashboard/profile/logo/delete', requireRole('tradie'), requireCan('profile'), (req, res) => {
+  if (req.user.profile && req.user.profile.logo) {
+    uploads.remove(req.user.profile.logo);
+    photoQ.setLogo.run(null, req.account.ownerId);
+  }
+  res.redirect('/dashboard/profile/photos');
+});
 
 router.get('/dashboard/profile', requireRole('tradie'), requireCan('profile'), (req, res) => {
   const p = req.user.profile;

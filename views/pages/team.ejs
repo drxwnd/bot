@@ -1,4 +1,4 @@
-<%- include('../partials/head') %>
+<%- include(kind === 'admin' ? '../partials/head' : '../partials/dash-start', { dashNav: 'team' }) %>
 <div class="wrap">
   <div class="page-head">
     <h1><%= kind === 'admin' ? 'Tradebench staff' : 'Your team' %></h1>
@@ -90,4 +90,4 @@
     </aside>
   </div>
 </div>
-<%- include('../partials/foot') %>
+<%- include(kind === 'admin' ? '../partials/foot' : '../partials/dash-end') %>

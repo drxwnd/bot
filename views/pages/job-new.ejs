@@ -52,9 +52,9 @@
       <% }) %>
 
       <div class="field">
-        <label for="photos">Photos <span class="hint" style="display:inline">(optional, up to 6)</span></label>
-        <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
-        <span class="hint">JPG, PNG or HEIC, max 8MB each. If you got an error, add the photos again.</span>
+        <span class="label">Photos <span class="hint" style="display:inline">(optional, up to 6)</span></span>
+        <%- include('../partials/photo-drop', { id: 'photos', name: 'photos', max: 6, label: 'Add photos of the job', hint: 'A wide shot and a close-up help tradies price it. Tap to choose, or drag them here.' }) %>
+        <span class="hint">If the form comes back with an error, add the photos again.</span>
       </div>
 
       <hr>

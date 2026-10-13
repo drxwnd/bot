@@ -13,6 +13,7 @@ const { TRADE_INFO, REGION_INFO } = require('./src/seo-content');
 const { PHOTOS } = require('./src/photos');
 const db = require('./src/db');
 const mailer = require('./src/mailer');
+const uploads = require('./src/uploads');
 
 const app = express();
 
@@ -30,6 +31,7 @@ Object.assign(app.locals, locals, {
   businessAbn: config.businessAbn ? formatAbn(config.businessAbn) : '',
   legalName: config.legalName,
   maxQuoteCents: config.maxQuoteCents,
+  thumb: uploads.thumb,
   jsonForScript: seo.jsonForScript,
 });
 
@@ -60,7 +62,7 @@ app.use(
         'style-src': ["'self'", 'https://fonts.googleapis.com'],
         'style-src-attr': ["'unsafe-inline'"],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
-        'img-src': ["'self'", 'data:'],
+        'img-src': ["'self'", 'data:', 'blob:'],
         'script-src': ["'self'", ...(config.plausibleDomain ? ['https://plausible.io'] : [])],
         'connect-src': ["'self'", ...(config.plausibleDomain ? ['https://plausible.io'] : [])],
         'form-action': ["'self'", 'https://checkout.stripe.com', 'https://connect.stripe.com'],
@@ -108,6 +110,7 @@ app.use(require('./src/routes/work'));
 app.use(require('./src/routes/public'));
 app.use(require('./src/routes/auth'));
 app.use(require('./src/routes/jobs'));
+app.use(require('./src/routes/dash'));
 app.use(require('./src/routes/dashboard'));
 app.use('/admin', require('./src/routes/admin'));
 

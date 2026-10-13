@@ -1,92 +1,98 @@
-<%- include('../partials/head') %>
-<div class="wrap">
-  <div class="page-head">
-    <span class="eyebrow"><%= profile ? profile.business_name : user.name %></span>
-    <h1>Dashboard</h1>
+<%- include('../partials/dash-start') %>
+<%
+  const firstName = user.name.split(' ')[0];
+  const doneSteps = steps.filter(s => s.done).length;
+  const actions = quotes.filter(qt => qt.state.action || (qt.state.key === 'won' && qt.payment_status !== 'held' && qt.job_status === 'awarded'));
+%>
+<div class="dash-head">
+  <div>
+    <p class="eyebrow">G'day <%= firstName %></p>
+    <h1>Overview</h1>
+  </div>
+  <a class="btn" href="/dashboard/jobs">Find jobs</a>
+</div>
+
+<% if (doneSteps < steps.length) { %>
+  <section class="card setup">
+    <div class="setup-top">
+      <h2>Get set up to win work</h2>
+      <span class="small muted"><%= doneSteps %> of <%= steps.length %> done</span>
+    </div>
+    <div class="meter"><span style="width:<%= Math.round(doneSteps / steps.length * 100) %>%"></span></div>
+    <ol class="steps-list">
+      <% steps.forEach(s => { %>
+        <li class="<%= s.done ? 'done' : '' %>">
+          <span class="tick" aria-hidden="true"><%= s.done ? '✓' : '' %></span>
+          <% if (!s.done && s.href) { %><a href="<%= s.href %>"><%= s.label %></a><% } else { %><span><%= s.label %><%= s.done ? '' : '' %></span><% } %>
+          <% if (s.done) { %><span class="sr-only">(done)</span><% } %>
+        </li>
+      <% }) %>
+    </ol>
+    <% if (profile && profile.status === 'rejected') { %><p class="notice error" style="margin:14px 0 0">We couldn't approve your details. Check them on your <a href="/dashboard/profile">business profile</a>, or reply to our email and we'll tell you what's missing.</p><% } %>
+  </section>
+<% } %>
+
+<div class="kpis">
+  <div class="kpi"><span>Paid to you this month</span><b><%= money(earned.this_month) %></b></div>
+  <div class="kpi"><span>Coming to you</span><b><%= money(earned.held) %></b><small>Held until customers sign off</small></div>
+  <div class="kpi"><span>Win rate</span><b><%= winRate === null ? '–' : winRate + '%' %></b><small><%= won.length %> won of <%= quotes.length %> quoted</small></div>
+  <div class="kpi"><span>Rating</span><b><%= rating ? rating.toFixed(1) : '–' %><% if (rating) { %> <span class="star">★</span><% } %></b><small><%= reviews.length %> review<%= reviews.length === 1 ? '' : 's' %></small></div>
+</div>
+
+<div class="dash-cols">
+  <div>
+    <section class="card">
+      <div class="card-head"><h2>Needs you</h2></div>
+      <% if (!actions.length) { %>
+        <p class="muted small" style="margin:0">Nothing waiting on you. Nice.</p>
+      <% } else { %>
+        <ul class="action-list">
+          <% actions.forEach(qt => { %>
+            <li>
+              <span class="dot <%= qt.state.action ? 'go' : 'wait' %>" aria-hidden="true"></span>
+              <span><strong><%= qt.title %></strong><small><%= qt.state.action ? 'Paid. Go ahead with the job.' : 'Accepted. Waiting for the customer to pay.' %> <%= qt.suburb %></small></span>
+              <a class="btn small <%= qt.state.action ? 'accent' : 'ghost' %>" href="/jobs/<%= qt.job_id %>"><%= qt.state.action ? 'Open job' : 'View' %></a>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>New jobs for you</h2><a href="/dashboard/jobs">See all</a></div>
+      <% if (!profile || profile.status !== 'approved') { %>
+        <p class="muted small" style="margin:0">Jobs that match your trades and areas show here once you're approved. You can <a href="/jobs">browse every open job</a> in the meantime.</p>
+      <% } else if (!matches.length) { %>
+        <p class="muted small" style="margin:0">No new jobs in your trades and areas right now. We'll email you when one comes in.</p>
+      <% } else { %>
+        <div class="job-rows tight">
+          <% matches.forEach(job => { %><%- include('../partials/job-row', { job }) %><% }) %>
+        </div>
+      <% } %>
+    </section>
   </div>
 
-  <div class="page" style="padding-top:0">
-    <% if (!profile) { %>
-      <div class="notice info">Add your business details so we can check you over. You can't quote until that's done. <a href="/dashboard/profile">Add details</a></div>
-    <% } else if (profile.status === 'pending') { %>
-      <div class="notice info">We're checking your ABN, licence and insurance. This usually takes one business day. You can <a href="/jobs">browse jobs</a> in the meantime.</div>
-    <% } else if (profile.status === 'rejected') { %>
-      <div class="notice error">We couldn't approve your account with the details given. Email <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a> and we'll explain what's missing.</div>
-    <% } else if (!profile.payouts_enabled) { %>
-      <div class="notice info">You're approved. Set up payouts so you can get paid when customers sign off jobs. <a href="/dashboard/payouts">Set up payouts</a></div>
+  <div>
+    <% if (can('money')) { %>
+      <section class="card">
+        <div class="card-head"><h2>Paid to you, last 6 months</h2><a href="/dashboard/earnings">Earnings</a></div>
+        <%- include('../partials/bar-chart', { months, width: 340, height: 200, label: 'Money paid to you each month for the last six months' }) %>
+      </section>
     <% } %>
-
-    <div class="stats">
-      <div><span>Account</span><b style="font-size:1rem;margin-top:8px"><span class="tag <%= profile ? profile.status : 'pending' %>"><%= profile ? profile.status : 'incomplete' %></span></b></div>
-      <div><span>Quotes sent</span><b><%= quotes.length %></b></div>
-      <div><span>Jobs won</span><b><%= quotes.filter(q => q.status === 'accepted').length %></b></div>
-      <div><span>Paid out</span><b><%= money(paidOut) %></b></div>
-    </div>
-
-    <div class="with-side">
-      <div>
-        <% if (profile && profile.status === 'approved') { %>
-          <div class="section-head" style="margin-bottom:16px"><h2 style="font-size:1.4rem">New jobs for you</h2><a href="/jobs">All jobs</a></div>
-          <% if (matches.length) { %>
-            <div class="job-rows" style="margin-bottom:48px">
-              <% matches.forEach(job => { job.quote_count = job.quote_count || 0; %>
-                <a class="job-row" href="/jobs/<%= job.id %>">
-                  <span class="n">#<%= String(job.id).padStart(4, '0') %></span>
-                  <span class="t"><%= job.title %></span>
-                  <span class="r"><%= ago(job.created_at) %></span>
-                  <span class="m"><span><%= tradeName[job.trade] %></span><span><%= job.suburb %></span><span><%= budgetName[job.budget] %></span></span>
-                </a>
-              <% }) %>
-            </div>
-          <% } else { %>
-            <div class="empty" style="margin-bottom:48px">No new jobs in your trades and areas right now. Check back soon.</div>
-          <% } %>
-        <% } %>
-
-        <h2 style="font-size:1.4rem">Your quotes</h2>
-        <% if (quotes.length) { %>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Job</th><th class="num">Quote</th><th>Status</th></tr></thead>
-              <tbody>
-                <% quotes.forEach(q => {
-                  let label = q.status, cls = q.status;
-                  if (q.status === 'accepted') {
-                    label = q.job_status === 'completed' ? 'paid out' : q.payment_status === 'held' ? 'paid, start work' : 'won, awaiting payment';
-                    cls = q.job_status === 'completed' || q.payment_status === 'held' ? 'released' : 'pending';
-                  } else if (q.status === 'pending' && q.job_status !== 'open') { label = 'job closed'; cls = 'cancelled'; }
-                %>
-                  <tr>
-                    <td><a href="/jobs/<%= q.job_id %>"><%= q.title %></a><br><span class="small muted"><%= q.suburb %> &middot; sent <%= ago(q.created_at) %></span></td>
-                    <td class="num"><%= money(q.amount_cents) %></td>
-                    <td><span class="tag <%= cls %>"><%= label %></span></td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
+    <section class="card">
+      <div class="card-head"><h2>Latest reviews</h2><a href="/dashboard/reviews">All reviews</a></div>
+      <% if (!reviews.length) { %>
+        <p class="muted small" style="margin:0">Reviews from customers show here and on your public profile. They're the biggest thing customers look at when picking a quote.</p>
+      <% } else { %>
+        <% reviews.slice(0, 2).forEach(r => { %>
+          <div class="mini-review">
+            <span class="star"><%= '★'.repeat(r.rating) %></span><span class="star off"><%= '★'.repeat(5 - r.rating) %></span>
+            <% if (r.comment) { %><p>"<%= r.comment.length > 140 ? r.comment.slice(0, 140) + '…' : r.comment %>"</p><% } %>
+            <small><%= r.customer_name.split(' ')[0] %>, <%= r.suburb %></small>
           </div>
-        <% } else { %>
-          <div class="empty">You haven't sent any quotes yet.</div>
-        <% } %>
-      </div>
-
-      <aside>
-        <div class="box">
-          <h3>Your account</h3>
-          <ul class="plain-list small" style="margin-top:8px">
-            <li><a href="/work">Work: jobs, schedule and invoices</a></li>
-            <% if (can('team')) { %><li><a href="/team">Team</a></li><% } %>
-            <li><a href="/dashboard/profile">Business details</a></li>
-            <% if (can('payouts')) { %><li><a href="/dashboard/payouts">Payouts</a> <%= profile && profile.payouts_enabled ? '· set up' : '· not set up' %></li><% } %>
-            <% if (profile && profile.status === 'approved') { %><li><a href="/tradies/<%= account.ownerId %>">Your public profile</a></li><% } %>
-          </ul>
-        </div>
-        <div class="box">
-          <h3>How you get paid</h3>
-          <p class="small muted" style="margin:0">Customers pay when they accept your quote, and we hold it. Once they sign the job off, we send you the full amount minus <%= feeLabel %>. It usually lands in your bank within 2 business days.</p>
-        </div>
-      </aside>
-    </div>
+        <% }) %>
+      <% } %>
+    </section>
   </div>
 </div>
-<%- include('../partials/foot') %>
+<%- include('../partials/dash-end') %>

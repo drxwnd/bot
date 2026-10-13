@@ -1,0 +1,38 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head"><h1>Account</h1></div>
+<div class="dash-cols">
+  <section class="card">
+    <div class="card-head"><h2>Your details</h2></div>
+    <form method="post" action="/dashboard/account">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="name">Your name</label><input id="name" name="name" value="<%= me.name %>" required autocomplete="name"></div>
+      <div class="field"><label for="email">Email</label><input id="email" value="<%= me.email %>" disabled><span class="hint">To change your email, contact <a href="mailto:<%= supportEmail %>"><%= supportEmail %></a>.</span></div>
+      <div class="field"><label for="phone">Mobile</label><input id="phone" name="phone" type="tel" value="<%= me.phone || '' %>" autocomplete="tel"></div>
+      <% if (me.role === 'customer' && can('team')) { %>
+        <div class="field"><label for="company">Business or organisation <span class="hint" style="display:inline">(optional)</span></label><input id="company" name="company" value="<%= me.company || '' %>" autocomplete="organization"></div>
+      <% } %>
+      <label class="check-row"><input type="checkbox" name="email_alerts" value="1" <%= me.email_alerts ? 'checked' : '' %>> <span><strong>Job alerts and reminders by email</strong><br><span class="small muted"><%= me.role === 'tradie' ? 'New jobs in your trades and areas, and nudges when something needs you.' : 'Nudges when quotes are waiting or a payment needs releasing.' %> Emails about your own jobs and payments always come through.</span></span></label>
+      <button class="btn">Save</button>
+    </form>
+  </section>
+  <div>
+    <section class="card">
+      <div class="card-head"><h2>Change password</h2></div>
+      <form method="post" action="/dashboard/account/password">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field"><label for="current">Current password</label><input id="current" name="current" type="password" autocomplete="current-password" required></div>
+        <div class="field"><label for="password">New password</label><input id="password" name="password" type="password" minlength="8" autocomplete="new-password" required><span class="hint">At least 8 characters. Other devices get logged out.</span></div>
+        <button class="btn">Change password</button>
+      </form>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Devices</h2></div>
+      <p class="small muted">Lost a phone, or logged in on someone else's computer? Log out everywhere except here.</p>
+      <form method="post" action="/dashboard/account/logout-everywhere" data-confirm="Log out of every other device?">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn ghost small">Log out of other devices</button>
+      </form>
+    </section>
+  </div>
+</div>
+<%- include('../partials/dash-end') %>

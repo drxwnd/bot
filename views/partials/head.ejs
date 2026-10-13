@@ -12,7 +12,7 @@
       if (can('quote')) accountLinks.push({ href: '/dashboard', label: 'Dashboard', match: '/dashboard' });
       accountLinks.push({ href: '/work', label: can('quote') ? 'Work' : 'My jobs', match: '/work' });
     }
-    if (user.role === 'customer') accountLinks.push({ href: '/dashboard', label: account.role === 'owner' ? 'My jobs' : 'Jobs', match: '/dashboard' });
+    if (user.role === 'customer') accountLinks.push({ href: '/dashboard', label: 'Dashboard', match: '/dashboard' });
     if (user.role !== 'admin' && can('team')) accountLinks.push({ href: '/team', label: 'Team', match: '/team' });
   }
   const fullTitle = title ? `${title} | ${siteName}` : `${siteName} | Tradies for homes, hotels and mine sites in WA`;

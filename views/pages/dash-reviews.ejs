@@ -1,0 +1,36 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head">
+  <div>
+    <h1>Reviews</h1>
+    <% if (rating) { %><p class="muted" style="margin:6px 0 0"><span class="star">★</span> <%= rating.toFixed(1) %> average from <%= reviews.length %> review<%= reviews.length === 1 ? '' : 's' %></p><% } %>
+  </div>
+  <% if (profile && profile.status === 'approved') { %><a class="btn ghost" href="/tradies/<%= account.ownerId %>">See your public profile</a><% } %>
+</div>
+<% if (!reviews.length) { %>
+  <div class="card empty-card">
+    <strong>No reviews yet</strong>
+    <p class="muted">Only customers who've paid for a job through <%= siteName %> can leave one, so every review counts. We ask them for one as soon as they release the payment.</p>
+  </div>
+<% } %>
+<% reviews.forEach(r => { %>
+  <article class="card review-card">
+    <div class="rc-top">
+      <span><span class="star"><%= '★'.repeat(r.rating) %></span><span class="star off"><%= '★'.repeat(5 - r.rating) %></span></span>
+      <span class="small muted"><%= shortDate(r.created_at) %></span>
+    </div>
+    <strong><%= r.title %></strong>
+    <div class="small muted"><%= r.customer_name.split(' ')[0] %>, <%= r.suburb %></div>
+    <% if (r.comment) { %><p class="prose"><%= r.comment %></p><% } %>
+    <% if (r.reply) { %>
+      <div class="reply"><strong>Your reply</strong><p><%= r.reply %></p></div>
+    <% } else if (can('profile')) { %>
+      <form method="post" action="/dashboard/reviews/<%= r.id %>/reply" class="reply-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label for="reply-<%= r.id %>" class="small">Reply publicly <span class="muted">(optional)</span></label>
+        <textarea id="reply-<%= r.id %>" name="reply" maxlength="1000" placeholder="Thanks <%= r.customer_name.split(' ')[0] %>, it was a pleasure."></textarea>
+        <button class="btn small">Post reply</button>
+      </form>
+    <% } %>
+  </article>
+<% }) %>
+<%- include('../partials/dash-end') %>

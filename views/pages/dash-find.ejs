@@ -1,0 +1,30 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head">
+  <div>
+    <h1>Jobs for you</h1>
+    <% if (profile) { %><p class="muted" style="margin:6px 0 0"><%= profile.trades.split(',').map(t => tradeName[t]).join(', ') %> · <%= profile.regions.length ? profile.regions.split(',').length : 0 %> area<%= profile.regions.split(',').length === 1 ? '' : 's' %> · <a href="/dashboard/profile">Change</a></p><% } %>
+  </div>
+  <a class="btn ghost" href="/jobs">Browse every job</a>
+</div>
+
+<% if (!profile || profile.status !== 'approved') { %>
+  <div class="card"><p style="margin:0"><%= profile ? "Jobs that match you appear here once we've checked your details." : 'Add your business details first, then the jobs that match your trades and areas show up here.' %> <% if (!profile) { %><a href="/dashboard/profile">Add details</a><% } %></p></div>
+<% } else if (!jobs.length) { %>
+  <div class="card empty-card">
+    <strong>No open jobs match you right now</strong>
+    <p class="muted">We email you the moment one comes in. To see more jobs, add areas you'd travel to on your business profile.</p>
+  </div>
+<% } else { %>
+  <p class="small muted"><%= jobs.length %> open job<%= jobs.length === 1 ? '' : 's' %> you haven't quoted on yet. Early quotes win more often.</p>
+  <div class="job-cards">
+    <% jobs.forEach(j => { %>
+      <a class="job-card" href="/jobs/<%= j.id %>">
+        <span class="jc-top"><span class="tag <%= j.sector === 'housing' ? '' : 'sector' %>"><%= sectorName[j.sector] %></span><span class="small muted"><%= ago(j.created_at) %></span></span>
+        <strong><%= j.title %></strong>
+        <span class="jc-meta"><span><%= tradeName[j.trade] %></span><span><%= j.suburb %></span><span><%= budgetName[j.budget] %></span><span><%= timingName[j.timing] %></span></span>
+        <span class="jc-foot small"><span><%= j.quote_count %> quote<%= j.quote_count === 1 ? '' : 's' %> so far</span><% if (j.photo_count) { %><span><%= j.photo_count %> photo<%= j.photo_count === 1 ? '' : 's' %></span><% } %></span>
+      </a>
+    <% }) %>
+  </div>
+<% } %>
+<%- include('../partials/dash-end') %>

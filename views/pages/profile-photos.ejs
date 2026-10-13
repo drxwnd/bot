@@ -1,0 +1,50 @@
+<%- include('../partials/dash-start', { dashNav: 'photos' }) %>
+<div class="dash-head">
+  <div>
+    <h1>Logo and photos</h1>
+    <p class="muted" style="margin:6px 0 0">These show on your public profile. Customers look at them when they compare quotes.</p>
+  </div>
+  <% if (profile.status === 'approved') { %><a class="btn ghost" href="/tradies/<%= account.ownerId %>">See your public profile</a><% } %>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>Logo</h2></div>
+  <div class="logo-row">
+    <span class="logo-preview"><% if (profile.logo) { %><img src="/uploads/<%= thumb(profile.logo) %>" alt="Your logo"><% } else { %><span><%= profile.business_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') %></span><% } %></span>
+    <form method="post" action="/dashboard/profile/photos" enctype="multipart/form-data" class="logo-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="kind" value="logo">
+      <%- include('../partials/photo-drop', { id: 'logo', name: 'photos', max: 1, label: profile.logo ? 'Change your logo' : 'Add your logo', hint: 'A square image works best' }) %>
+      <button class="btn small">Save logo</button>
+    </form>
+    <% if (profile.logo) { %>
+      <form method="post" action="/dashboard/profile/logo/delete" data-confirm="Remove your logo?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish small">Remove</button></form>
+    <% } %>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>Photos of your work</h2><span class="small muted"><%= photos.length %> of <%= max %></span></div>
+  <form method="post" action="/dashboard/profile/photos" enctype="multipart/form-data" class="work-photo-form">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="kind" value="work">
+    <%- include('../partials/photo-drop', { id: 'work', name: 'photos', max: 8, label: 'Add photos of jobs you\'ve done', hint: 'Up to 8 at a time. Before and after shots work well.' }) %>
+    <div class="field" style="margin:14px 0 10px"><label for="caption">Caption <span class="hint" style="display:inline">(optional, applies to these photos)</span></label><input id="caption" name="caption" maxlength="120" placeholder="e.g. Bathroom retile, Mount Lawley"></div>
+    <button class="btn">Upload</button>
+  </form>
+
+  <% if (photos.length) { %>
+    <div class="photo-grid">
+      <% photos.forEach(p => { %>
+        <figure>
+          <a href="/uploads/<%= p.filename %>" target="_blank" rel="noopener"><img src="/uploads/<%= thumb(p.filename) %>" alt="<%= p.caption || 'Work photo' %>" loading="lazy"></a>
+          <figcaption><span><%= p.caption || '' %></span>
+            <form method="post" action="/dashboard/profile/photos/<%= p.id %>/delete" data-confirm="Remove this photo?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish small">Remove</button></form>
+          </figcaption>
+        </figure>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+<p class="small muted">Only upload photos you took or have permission to use. We strip location data from every photo.</p>
+<%- include('../partials/dash-end') %>
