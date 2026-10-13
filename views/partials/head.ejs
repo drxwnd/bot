@@ -15,7 +15,11 @@
     if (user.role === 'customer') accountLinks.push({ href: '/dashboard', label: 'Dashboard', match: '/dashboard' });
     if (user.role !== 'admin' && can('team')) accountLinks.push({ href: '/team', label: 'Team', match: '/team' });
   }
-  const fullTitle = title ? `${title} | ${siteName}` : `${siteName} | Tradies for homes, hotels and mine sites in WA`;
+  // Google shows about 60 characters. Add the site name when it fits; trim very long titles (job
+  // titles typed by customers) at a word.
+  const trimTitle = (t) => t.length <= 60 ? t : t.slice(0, 58).replace(/[\s,;:.-]+\S*$/, '') + '…';
+  const fullTitle = !title ? `${siteName} | Tradies for homes, hotels and mine sites in WA`
+    : `${title} | ${siteName}`.length <= 62 ? `${title} | ${siteName}` : trimTitle(title);
   const metaDescription = typeof description !== 'undefined' && description ? description : 'Post a repair, maintenance or building job for a home, hotel or mine site in WA. Get quotes from checked tradies and pay only when the job is done.';
 %>
   <title><%= fullTitle %></title>

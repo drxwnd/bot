@@ -251,7 +251,13 @@ router.get('/jobs/:id', loadJob, (req, res) => {
     { name: `#${String(job.id).padStart(4, '0')}`, path: `/jobs/${job.id}` },
   ];
   res.render('pages/job', {
-    title: `${job.title}, ${job.suburb}`,
+    // Keep the suburb in the page title (it's what people search for) and shorten the job title instead.
+    title: (() => {
+      const room = 60 - job.suburb.length - 2;
+      const t = job.title.length <= room ? job.title
+        : job.title.slice(0, room - 1).replace(/[\s,;:.-]+\S*$/, '').replace(/(\s+(a|an|the|on|of|in|and|with|for|to|at))+$/i, '') + '…';
+      return `${t}, ${job.suburb}`;
+    })(),
     description: seo.truncate(`${C.tradeName[job.trade]} job in ${job.suburb}. ${job.description}`),
     breadcrumbs: job.trade === 'other' ? null : crumbs,
     jsonld: job.trade === 'other' ? [] : [seo.breadcrumbList(crumbs)],

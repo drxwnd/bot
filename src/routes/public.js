@@ -80,13 +80,13 @@ router.get('/for-tradies', (req, res) => {
 });
 
 router.get('/terms', (req, res) =>
-  res.render('pages/terms', { title: 'Terms of use', description: 'The terms for using the site as a customer or a tradie.' }),
+  res.render('pages/terms', { title: 'Terms of use', description: `The terms for using ${config.siteName} as a customer or a tradie: posting jobs, quoting, payments held until sign-off, fees and reviews.` }),
 );
 router.get('/photo-credits', (req, res) =>
-  res.render('pages/photo-credits', { title: 'Photo credits', description: 'Who took the photos used on the site, and their licences.' }),
+  res.render('pages/photo-credits', { title: 'Photo credits', description: `Who took the photos used on ${config.siteName}, where they came from, and the Creative Commons licence each one is shared under.` }),
 );
 router.get('/privacy', (req, res) =>
-  res.render('pages/privacy', { title: 'Privacy', description: 'What personal information we collect, why, and who sees it.' }),
+  res.render('pages/privacy', { title: 'Privacy', description: `What personal information ${config.siteName} collects, why we need it, who can see it, and how to get it corrected or deleted.` }),
 );
 
 const tradieById = db.prepare(`
@@ -118,6 +118,8 @@ router.get('/tradies/:id', (req, res, next) => {
     areaServed: areas.map((name) => ({ '@type': 'AdministrativeArea', name })),
     knowsAbout: trades,
   };
+  if (tradie.logo) business.logo = seo.url(`/uploads/${tradie.logo}`);
+  if (tradie.logo || photos.length) business.image = [tradie.logo, ...photos.map((p) => p.filename)].filter(Boolean).slice(0, 6).map((f) => seo.url(`/uploads/${f}`));
   if (reviews.length) {
     business.aggregateRating = { '@type': 'AggregateRating', ratingValue: avg.toFixed(1), reviewCount: reviews.length, bestRating: 5, worstRating: 1 };
     business.review = reviews.slice(0, 5).map((r) => ({
@@ -130,7 +132,7 @@ router.get('/tradies/:id', (req, res, next) => {
   }
   res.render('pages/tradie-profile', {
     photos,
-    title: `${tradie.business_name}: ${trades.slice(0, 2).join(' and ')}`,
+    title: `${tradie.business_name}: ${trades[0]}${trades.length > 1 ? ' and more' : ''}`,
     description: seo.truncate(`${tradie.business_name}, ${trades.join(', ').toLowerCase()} covering ${areas.slice(0, 3).join(', ')}. ${avg ? `Rated ${avg.toFixed(1)} from ${reviews.length} reviews. ` : ''}ABN and insurance checked.`),
     jsonld: [business],
     tradie,
