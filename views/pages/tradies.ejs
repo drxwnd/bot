@@ -1,9 +1,12 @@
 <%- include('../partials/head') %>
-<section class="band" style="padding-top:72px">
-  <div class="wrap split">
+<section class="band photo-band">
+  <div class="banner-media" aria-hidden="true">
+    <%- include('../partials/photo', { photo: 'headTradies', cls: 'banner-img', eager: true }) %>
+  </div>
+  <div class="wrap split banner-inner">
     <div>
-      <h1 style="color:var(--white)">Find work around WA without paying for leads</h1>
-      <p style="font-size:1.1rem;max-width:480px">Looking at jobs and quoting is free. If you win the job, we take <%= feePercent %>% when the customer releases payment.</p>
+      <h1>Find work around WA without paying for leads</h1>
+      <p class="lede">Looking at jobs and quoting is free. If you win the job, we take <%= feePercent %>% when the customer releases payment.</p>
       <p style="margin-top:28px"><a class="btn big" href="/signup?as=tradie">Join free</a></p>
     </div>
     <div>
@@ -18,7 +21,6 @@
 </section>
 
 <div class="wrap narrow page doc">
-  <%- include('../partials/photo', { photo: 'perthSiteCranes', cls: 'wide blend' }) %>
   <h2>How you get paid</h2>
   <p>The customer pays when they accept your quote, before you start. You'll see it on the job page, so you know the money's there before you buy materials or book the day.</p>
   <p>When they sign the job off, the payment goes to your bank through Stripe, usually within 2 business days. You don't have to chase an invoice.</p>

@@ -1,15 +1,19 @@
 <%- include('../partials/head') %>
-<div class="wrap">
-  <div class="page-head with-photo">
-    <div>
+<section class="banner">
+  <div class="banner-media" aria-hidden="true">
+    <%- include('../partials/photo', { photo: 'headMining', cls: 'banner-img', eager: true }) %>
+  </div>
+  <div class="wrap banner-inner">
+    <div class="banner-copy">
       <h1>Trades for mine sites, camps and workshops</h1>
       <p>For the smaller jobs that don't need a full tender. That covers camp and village maintenance, workshop repairs, fabrication, and work on site offices. Post the job with the site requirements and get quotes from tradies who already hold the tickets.</p>
-      <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?sector=mining">Post a mining job</a></p>
+      <p class="banner-cta"><a class="btn accent big" href="/jobs/new?sector=mining">Post a mining job</a></p>
     </div>
-    <%- include('../partials/photo', { photo: 'goldfieldsMine', eager: true }) %>
   </div>
+</section>
+<div class="wrap">
 
-  <div class="split page" style="padding-top:8px">
+  <div class="split page">
     <div class="doc">
       <h2>What gets posted</h2>
       <ul class="tick-list">

@@ -1,17 +1,21 @@
 <%- include('../partials/head') %>
 
-<section class="hero">
-  <div class="wrap">
-    <div>
-      <h1>Get quotes from checked tradies across WA</h1>
-      <p class="lede">Post a repair, maintenance or building job for a home, a hotel or a mine site. It's free to post. Tradies send you a price, and your payment is held until the work is finished.</p>
-      <div class="ctas">
+<section class="hero-photo">
+  <div class="hero-media" aria-hidden="true">
+    <%- include('../partials/photo', { photo: 'heroCrane', cls: 'hero-img', eager: true }) %>
+  </div>
+  <div class="wrap hero-inner">
+    <div class="hero-copy">
+      <p class="eyebrow rise">Perth and regional WA</p>
+      <h1 class="rise">Get quotes from checked tradies across WA</h1>
+      <p class="lede rise">Post a repair, maintenance or building job for a home, a hotel or a mine site. It's free to post. Tradies send you a price, and your payment is held until the work is finished.</p>
+      <div class="ctas rise">
         <a class="btn accent big" href="/start?path=need">Get quotes</a>
         <a class="link-plain" href="/start?path=tradie">I'm a tradie</a>
       </div>
     </div>
 
-    <figure class="preview">
+    <figure class="preview rise">
       <div class="docket" aria-label="Example job">
         <div class="docket-body">
           <h3>Regrout shower and replace four cracked floor tiles</h3>
@@ -38,24 +42,30 @@
 <section class="section">
   <div class="wrap">
     <h2>What kind of work?</h2>
-    <div class="sector-cards">
-      <div class="sector-card">
-        <%- include('../partials/photo', { photo: 'bathroomRetile', cls: 'wide' }) %>
-        <h3><a href="/housing">Housing</a></h3>
-        <p>Repairs, maintenance and renovations for homeowners, landlords and property managers.</p>
-        <a href="/jobs/new?sector=housing">Post a home job</a>
+    <div class="tiles">
+      <div class="tile">
+        <%- include('../partials/photo', { photo: 'tileHousing' }) %>
+        <div class="tile-body">
+          <h3><a class="tile-link" href="/housing">Housing</a></h3>
+          <p>Repairs, maintenance and renovations for homeowners, landlords and property managers.</p>
+          <span class="tile-go">Home jobs</span>
+        </div>
       </div>
-      <div class="sector-card">
-        <%- include('../partials/photo', { photo: 'bathroomFinished', cls: 'wide' }) %>
-        <h3><a href="/hotels">Hotels</a></h3>
-        <p>Room repairs, air con, bathrooms and refurbishments, worked around your guests.</p>
-        <a href="/jobs/new?sector=hotels">Post a hotel job</a>
+      <div class="tile">
+        <%- include('../partials/photo', { photo: 'tileHotels' }) %>
+        <div class="tile-body">
+          <h3><a class="tile-link" href="/hotels">Hotels</a></h3>
+          <p>Room repairs, air con, bathrooms and refurbishments, worked around your guests.</p>
+          <span class="tile-go">Hotel jobs</span>
+        </div>
       </div>
-      <div class="sector-card">
-        <%- include('../partials/photo', { photo: 'pilbaraMine', cls: 'wide' }) %>
-        <h3><a href="/mining">Mining</a></h3>
-        <p>Camp maintenance, workshop repairs and fabrication, with site requirements listed up front.</p>
-        <a href="/jobs/new?sector=mining">Post a mining job</a>
+      <div class="tile">
+        <%- include('../partials/photo', { photo: 'tileMining' }) %>
+        <div class="tile-body">
+          <h3><a class="tile-link" href="/mining">Mining</a></h3>
+          <p>Camp maintenance, workshop repairs and fabrication, with site requirements listed up front.</p>
+          <span class="tile-go">Mining jobs</span>
+        </div>
       </div>
     </div>
   </div>
@@ -110,8 +120,11 @@
 </section>
 <% } %>
 
-<section class="band">
-  <div class="wrap split">
+<section class="band photo-band">
+  <div class="banner-media" aria-hidden="true">
+    <%- include('../partials/photo', { photo: 'authTradie', cls: 'banner-img' }) %>
+  </div>
+  <div class="wrap split banner-inner">
     <div>
       <h2>Tradies: no lead fees</h2>
       <p>Seeing jobs and quoting is free. If you win the work, we take <%= feePercent %>% when the customer releases payment and the rest goes to your bank.</p>

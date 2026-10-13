@@ -1,5 +1,5 @@
 <%- include('../partials/head') %>
-<div class="auth-wrap">
+<div class="auth-split">
 <div class="auth">
   <div class="choice">
     <a href="/signup<%= next ? '?next=' + encodeURIComponent(next) : '' %>" class="<%= as === 'customer' ? 'on' : '' %>">I need work done</a>
@@ -50,6 +50,17 @@
   </form>
   <p class="alt">Already have an account? <a href="/login<%= next ? '?next=' + encodeURIComponent(next) : '' %>">Log in</a></p>
 </div>
-<%- include('../partials/photo', { photo: as === 'tradie' ? 'perthSiteExcavator' : 'bathroomTiles', cls: as === 'tradie' ? 'auth-photo blend' : 'auth-photo', eager: true }) %>
+<aside class="auth-media">
+  <%- include('../partials/photo', { photo: as === 'tradie' ? 'authTradie' : 'authCustomer', cls: 'auth-img', eager: true }) %>
+  <div class="auth-quote">
+    <% if (as === 'tradie') { %>
+      <p>No lead fees. Quote for free, and get paid before you start.</p>
+      <span><%= feePercent %>% only when you win the job</span>
+    <% } else { %>
+      <p>Post a job in two minutes and get fixed prices from checked tradies.</p>
+      <span>Free to post. Your payment is held until the job's done.</span>
+    <% } %>
+  </div>
+</aside>
 </div>
 <%- include('../partials/foot') %>

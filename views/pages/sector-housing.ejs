@@ -1,15 +1,19 @@
 <%- include('../partials/head') %>
-<div class="wrap">
-  <div class="page-head with-photo">
-    <div>
+<section class="banner">
+  <div class="banner-media" aria-hidden="true">
+    <%- include('../partials/photo', { photo: 'headHousing', cls: 'banner-img', eager: true }) %>
+  </div>
+  <div class="wrap banner-inner">
+    <div class="banner-copy">
       <h1>Repairs and building work for your home</h1>
       <p>For homeowners, landlords and property managers. Post the job for free, compare quotes from checked tradies, and only pay out when the work's done.</p>
-      <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?sector=housing">Post a home job</a></p>
+      <p class="banner-cta"><a class="btn accent big" href="/jobs/new?sector=housing">Post a home job</a></p>
     </div>
-    <%- include('../partials/photo', { photo: 'bathroomTiles', eager: true }) %>
   </div>
+</section>
+<div class="wrap">
 
-  <div class="split page" style="padding-top:8px">
+  <div class="split page">
     <div class="doc">
       <h2>What people post</h2>
       <ul class="tick-list">
