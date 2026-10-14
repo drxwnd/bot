@@ -52,7 +52,7 @@
           <% if (job.status === 'awarded') { %>
             <% const custFee = customerFeeFor(awardedTradie.amount_cents); %>
             <h3>Pay <%= money(awardedTradie.amount_cents + custFee) %> to lock it in</h3>
-            <% if (custFee) { %><p class="small muted" style="margin-bottom:6px"><%= money(awardedTradie.amount_cents) %> quote plus a <%= money(custFee) %> secure payment fee.</p><% } %>
+            <% if (custFee) { %><p class="small muted" style="margin-bottom:6px"><%= money(awardedTradie.amount_cents) %> quote plus a <%= money(custFee) %> secure payment fee. If the job is refunded, the quote comes back to you; the fee isn't refundable.</p><% } %>
             <p class="small muted">We hold the money. The tradie can see it's been paid, but they don't receive it until you confirm the job is done.</p>
             <% if (!canPay) { %>
               <div class="notice info" style="margin:0">A manager or the account owner needs to pay for this job.</div>

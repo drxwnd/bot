@@ -225,6 +225,8 @@ db.exec(`UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE session
 addColumn('users', 'email_alerts', 'INTEGER NOT NULL DEFAULT 1');
 addColumn('payments', 'customer_fee_cents', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('payments', 'disputed', 'INTEGER NOT NULL DEFAULT 0');
+// How much went back to the customer. The secure payment fee isn't refunded.
+addColumn('payments', 'refunded_cents', 'INTEGER');
 
 db.exec(`
 -- Every email we send (or would have sent, without a provider). Kept for support and debugging.

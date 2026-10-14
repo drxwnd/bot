@@ -17,7 +17,7 @@
               <td><a href="/jobs/<%= p.job_id %>"><%= p.title %></a><br><span class="small muted"><%= p.suburb %> · paid <%= shortDate(p.paid_at) %></span></td>
               <td><%= p.business_name %></td>
               <td><span class="tag <%= p.status %>"><%= p.status === 'held' ? 'held' : p.status === 'released' ? 'released to tradie' : p.status %></span></td>
-              <td class="num"><strong><%= money(p.amount_cents + p.customer_fee_cents) %></strong><% if (p.customer_fee_cents) { %><br><span class="small muted">inc. <%= money(p.customer_fee_cents) %> fee</span><% } %></td>
+              <td class="num"><strong><%= money(p.amount_cents + p.customer_fee_cents) %></strong><% if (p.customer_fee_cents) { %><br><span class="small muted">inc. <%= money(p.customer_fee_cents) %> fee</span><% } %><% if (p.status === 'refunded' && p.refunded_cents != null) { %><br><span class="small muted"><%= money(p.refunded_cents) %> refunded</span><% } %></td>
             </tr>
           <% }) %>
         </tbody>

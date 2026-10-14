@@ -2,7 +2,9 @@
 //   1. Customer pays the accepted quote by card. Funds land in the platform's Stripe balance (status: held).
 //   2. Customer confirms the job is done. We transfer the quote amount minus our fee to the tradie's
 //      connected Stripe account (status: released). The fee stays with the platform.
-//   3. If something goes wrong before release, an admin can refund the customer.
+//   3. If something goes wrong before release, an admin can refund the customer. Only the quote
+//      amount goes back: the secure payment fee (customer_fee_cents) is kept, since the card costs
+//      it covers have already been paid.
 //
 // Without STRIPE_SECRET_KEY (local development only) payments are simulated so the flow can be tested.
 
@@ -28,7 +30,7 @@ const q = {
   markReleased: db.prepare(`
     UPDATE payments SET status = 'released', released_at = datetime('now'), transfer_id = ?
     WHERE id = ? AND status = 'held'`),
-  markRefunded: db.prepare(`UPDATE payments SET status = 'refunded' WHERE id = ? AND status = 'held'`),
+  markRefunded: db.prepare(`UPDATE payments SET status = 'refunded', refunded_cents = ? WHERE id = ? AND status = 'held'`),
   jobPaid: db.prepare(`UPDATE jobs SET status = 'paid' WHERE id = ? AND status = 'awarded'`),
   jobCompleted: db.prepare(`UPDATE jobs SET status = 'completed' WHERE id = ? AND status = 'paid'`),
   jobCancelled: db.prepare(`UPDATE jobs SET status = 'cancelled' WHERE id = ?`),
@@ -194,9 +196,12 @@ async function confirmCheckoutSession(sessionOrId) {
 
   const pi = await stripe.paymentIntents.retrieve(session.payment_intent);
   if (payment.status !== 'pending' && payment.stripe_payment_intent && payment.stripe_payment_intent !== pi.id) {
-    // A second payment for a job that's already paid. Refund the extra one.
-    await stripe.refunds.create({ payment_intent: pi.id }, { idempotencyKey: `dup-refund-${pi.id}` });
-    notify.adminAlert(`A second payment (${pi.id}) came in for job ${payment.job_id}, which was already paid. It was refunded automatically.`);
+    // A second payment for a job that's already paid. Refund the extra one, less the payment fee.
+    await stripe.refunds.create(
+      { payment_intent: pi.id, amount: payment.amount_cents },
+      { idempotencyKey: `dup-refund-${pi.id}` },
+    );
+    notify.adminAlert(`A second payment (${pi.id}) came in for job ${payment.job_id}, which was already paid. The quote amount was refunded automatically.`);
     return false;
   }
   return markHeld(paymentId, pi.id, pi.latest_charge);
@@ -256,13 +261,14 @@ async function doRelease(payment, tradieProfile) {
 
 async function doRefund(payment) {
   if (payment.status !== 'held') throw new Error('Only held payments can be refunded');
+  const amount = payment.amount_cents;
   if (stripe) {
     await stripe.refunds.create(
-      { payment_intent: payment.stripe_payment_intent },
+      { payment_intent: payment.stripe_payment_intent, amount },
       { idempotencyKey: `refund-${payment.id}` },
     );
   }
-  if (q.markRefunded.run(payment.id).changes) {
+  if (q.markRefunded.run(amount, payment.id).changes) {
     q.jobCancelled.run(payment.job_id);
     notify.refunded(payment.job_id);
   }
@@ -288,13 +294,19 @@ function disputeClosed(dispute) {
   if (payment && dispute.status === 'won') db.prepare('UPDATE payments SET disputed = 0 WHERE id = ?').run(payment.id);
 }
 
-// A refund made straight from the Stripe dashboard instead of our admin page.
+// A refund made straight from the Stripe dashboard instead of our admin page. Refunds here leave
+// the payment fee behind, so Stripe doesn't call the charge "refunded": go by the amount instead.
 function refundedInStripe(charge) {
-  if (!charge.refunded) return;
   const payment = paymentForStripe(charge.id, charge.payment_intent);
-  if (payment && q.markRefunded.run(payment.id).changes) {
-    q.jobCancelled.run(payment.job_id);
-    notify.refunded(payment.job_id);
+  if (!payment || payment.status !== 'held') return;
+  const back = charge.amount_refunded || 0;
+  if (back >= payment.amount_cents) {
+    if (q.markRefunded.run(back, payment.id).changes) {
+      q.jobCancelled.run(payment.job_id);
+      notify.refunded(payment.job_id);
+    }
+  } else if (back > 0) {
+    notify.adminAlert(`${back} cents of payment ${payment.id} (job ${payment.job_id}) was refunded in Stripe, but not the whole quote. It's still held here, so check it before anyone releases it.`);
   }
 }
 

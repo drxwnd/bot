@@ -27,7 +27,8 @@ const q = {
     WHERE p.status != 'pending' ORDER BY p.created_at DESC LIMIT 200`),
   totals: db.prepare(`
     SELECT
-      COALESCE(SUM(CASE WHEN status = 'released' THEN fee_cents + customer_fee_cents END), 0) AS fees_earned,
+      COALESCE(SUM(CASE WHEN status = 'released' THEN fee_cents + customer_fee_cents
+        WHEN status = 'refunded' THEN MAX(0, amount_cents + customer_fee_cents - COALESCE(refunded_cents, amount_cents + customer_fee_cents)) END), 0) AS fees_earned,
       COALESCE(SUM(CASE WHEN status = 'held' THEN amount_cents + customer_fee_cents END), 0) AS held,
       COALESCE(SUM(CASE WHEN status = 'released' THEN amount_cents END), 0) AS volume
     FROM payments`),

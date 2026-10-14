@@ -84,7 +84,7 @@
               <% if (p.status === 'held' && can('money')) { %>
                 <div class="actions">
                   <form method="post" action="/admin/payments/<%= p.id %>/release" data-confirm="Release <%= money(p.amount_cents - p.fee_cents) %> to <%= p.business_name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn small">Release</button></form>
-                  <form method="post" action="/admin/payments/<%= p.id %>/refund" data-confirm="Refund <%= money(p.amount_cents + p.customer_fee_cents) %> to the customer and cancel the job?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ghost small">Refund</button></form>
+                  <form method="post" action="/admin/payments/<%= p.id %>/refund" data-confirm="Refund <%= money(p.amount_cents) %> to the customer and cancel the job?<%= p.customer_fee_cents ? ' The ' + money(p.customer_fee_cents) + ' payment fee is kept.' : '' %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ghost small">Refund</button></form>
                 </div>
               <% } %>
             </td>

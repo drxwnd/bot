@@ -221,6 +221,48 @@ test('job alerts, fees, contact details and reminders', async () => {
   assert.match(csv.text, /Replace two cracked tiles/);
 });
 
+test('a refund gives back the quote but keeps the secure payment fee', async () => {
+  const payments = require('../src/payments');
+  const user = (email, role) => Number(db.prepare("INSERT INTO users (email, password_hash, name, role) VALUES (?, '!', 'Test', ?)").run(email, role).lastInsertRowid);
+  const customerId = user('refund-me@test.local', 'customer');
+  const tradieId = user('refund-tradie@test.local', 'tradie');
+  const job = (title) => Number(db.prepare(`
+    INSERT INTO jobs (customer_id, title, trade, suburb, postcode, region, description, budget, timing, status)
+    VALUES (?, ?, 'tiling', 'Subiaco', '6008', 'central', 'Test', 'under-500', 'flexible', 'paid')`).run(customerId, title).lastInsertRowid);
+  const held = (jobId) => {
+    const quoteId = db.prepare("INSERT INTO quotes (job_id, tradie_id, amount_cents, message, status) VALUES (?, ?, 20000, 'x', 'accepted')").run(jobId, tradieId).lastInsertRowid;
+    return Number(db.prepare(`
+      INSERT INTO payments (job_id, quote_id, amount_cents, fee_cents, customer_fee_cents, status, stripe_charge_id, stripe_payment_intent)
+      VALUES (?, ?, 20000, 1500, 400, 'held', ?, ?)`).run(jobId, quoteId, `ch_${jobId}`, `pi_${jobId}`).lastInsertRowid);
+  };
+
+  // Refunded from the admin page: the quote goes back, the fee stays.
+  const first = held(job('Refund from admin'));
+  await payments.refund(one('SELECT * FROM payments WHERE id = ?', first));
+  await mailer.flush();
+  let p = one('SELECT * FROM payments WHERE id = ?', first);
+  assert.strictEqual(p.status, 'refunded');
+  assert.strictEqual(p.refunded_cents, 20000);
+  const email = emailsTo('refund-me@test.local', 'refunded').at(-1);
+  assert.match(email.body_text, /\$200\.00 has been refunded/);
+  assert.match(email.body_text, /\$4\.00 secure payment fee isn't refundable/);
+
+  // Refunded in the Stripe dashboard, quote amount only: Stripe doesn't call the charge refunded,
+  // but it is, so it must not stay releasable.
+  const second = held(job('Refund in Stripe'));
+  payments.refundedInStripe({ id: `ch_${one('SELECT job_id FROM payments WHERE id = ?', second).job_id}`, refunded: false, amount_refunded: 20000 });
+  p = one('SELECT * FROM payments WHERE id = ?', second);
+  assert.strictEqual(p.status, 'refunded');
+  assert.strictEqual(p.refunded_cents, 20000);
+
+  // A smaller refund in Stripe leaves it held and tells the admin.
+  const third = held(job('Part refund in Stripe'));
+  payments.refundedInStripe({ id: `ch_${one('SELECT job_id FROM payments WHERE id = ?', third).job_id}`, refunded: false, amount_refunded: 5000 });
+  assert.strictEqual(one('SELECT status FROM payments WHERE id = ?', third).status, 'held');
+  await mailer.flush();
+  assert.ok(emailsTo('boss@test.local', 'admin_alert').some((e) => /5000 cents of payment/.test(e.body_text)));
+});
+
 test('password reset and unsubscribe links', async () => {
   const user = browser();
   await signup(user, 'customer', 'Rhea', 'rhea@test.local');

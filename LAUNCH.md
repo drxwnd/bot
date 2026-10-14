@@ -110,7 +110,7 @@ What you keep per job, roughly, after Stripe:
 
 On 4% alone you keep about 2% of every job. Two settings change that, and both are off until you turn them on:
 - `MIN_FEE_DOLLARS=15`: no job earns you less than $15. Tradies still pay far less than buying leads elsewhere, where they pay whether they win or not.
-- `CUSTOMER_FEE_PERCENT=2`: adds a "secure payment fee" at checkout. It's shown clearly before they pay, refunded with any refund, and covered in the terms. This roughly doubles what you keep.
+- `CUSTOMER_FEE_PERCENT=2`: adds a "secure payment fee" at checkout. It's shown clearly before they pay and covered in the terms. It isn't refunded: a refund gives the customer back the quote amount only, so the fee still covers the card costs Stripe keeps on a refunded payment. This roughly doubles what you keep.
 
 **My suggestion:** launch with both, `MIN_FEE_DOLLARS=15` and `CUSTOMER_FEE_PERCENT=2`. Set them with `fly secrets set` and the site's wording updates itself.
 

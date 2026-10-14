@@ -147,6 +147,7 @@ const T = {
           ['Paid', money(payment.amount_cents + payment.customer_fee_cents)],
         ], total: true },
         "Nothing goes to the tradie until you tell us the job's done. If something goes wrong, reply to this email before you release the payment.",
+        ...(payment.customer_fee_cents ? ["If the job is refunded, the quote amount comes back to you. The secure payment fee isn't refundable."] : []),
       ],
       button: { label: 'View the job', href: url(`/jobs/${job.id}`) },
     }),
@@ -178,7 +179,10 @@ const T = {
       subject: `Refund for ${job.title}`,
       heading: "We've refunded your payment",
       lines: [
-        `${money(payment.amount_cents + payment.customer_fee_cents)} has been refunded to your card for "${job.title}". It usually shows up within 5 to 10 business days, depending on your bank.`,
+        `${money(payment.refunded_cents ?? payment.amount_cents)} has been refunded to your card for "${job.title}". It usually shows up within 5 to 10 business days, depending on your bank.`,
+        ...(payment.customer_fee_cents && (payment.refunded_cents ?? payment.amount_cents) < payment.amount_cents + payment.customer_fee_cents
+          ? [`The ${money(payment.customer_fee_cents)} secure payment fee isn't refundable, as it covers card costs that were already paid.`]
+          : []),
       ],
       button: { label: 'Post another job', href: url('/jobs/new') },
     }),
