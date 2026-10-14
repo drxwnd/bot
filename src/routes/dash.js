@@ -9,6 +9,9 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { flash, requireLogin, requireRole, requireCan, logIn, logOutEverywhere } = require('../middleware');
 const { can } = require('../permissions');
+const { oneOf } = require('../constants');
+const { hasContactDetails, oneLine } = require('../helpers');
+const { limit } = require('../ratelimit');
 
 const router = express.Router();
 
@@ -234,8 +237,8 @@ router.get('/dashboard/earnings.csv', ...tradieOnly, requireCan('money'), (req, 
   const cell = (v) => {
     const s = String(v ?? '');
     // Quote anything with commas or quotes, and stop spreadsheet formulas being injected.
-    const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
-    return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+    const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+    return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
   const rows = [['Date paid out', 'Job', 'Title', 'Suburb', 'Quote', 'Fee', 'Paid to you', 'Status']];
   for (const p of q.payouts.all(req.account.ownerId)) {
@@ -264,6 +267,10 @@ router.get('/dashboard/reviews', requireLogin, (req, res, next) => {
 router.post('/dashboard/reviews/:id/reply', ...tradieOnly, requireCan('profile'), (req, res) => {
   const review = q.review.get(Number(req.params.id), req.account.ownerId);
   const reply = String(req.body.reply || '').trim().slice(0, 1000);
+  if (hasContactDetails(reply)) {
+    flash(req, 'error', 'Leave phone numbers, emails and web links out of your reply. It goes on your public profile.');
+    return res.redirect('/dashboard/reviews');
+  }
   if (review && reply) {
     q.reply.run(reply, review.id);
     flash(req, 'success', 'Reply posted. It shows under the review on your public profile.');
@@ -276,7 +283,7 @@ router.post('/dashboard/reviews/:id/reply', ...tradieOnly, requireCan('profile')
 function customerJobs(req, res) {
   const ctx = customerContext(req);
   const TABS = { active: ['open', 'awarded', 'paid'], done: ['completed'], closed: ['cancelled'] };
-  const tab = TABS[req.query.tab] ? req.query.tab : 'all';
+  const tab = oneOf(TABS, req.query.tab, 'all');
   res.render('pages/dash-customer-jobs', {
     title: 'Your jobs',
     dashNav: 'jobs',
@@ -307,10 +314,10 @@ router.get('/dashboard/account', requireLogin, (req, res) => {
 
 router.post('/dashboard/account', requireLogin, (req, res) => {
   const me = q.user.get(req.user.id);
-  const name = String(req.body.name || '').trim().slice(0, 80);
-  const phone = String(req.body.phone || '').trim().slice(0, 30) || null;
+  const name = oneLine(req.body.name, 80);
+  const phone = oneLine(req.body.phone, 30) || null;
   // Only a customer account owner names the business; team members can't rename it.
-  const company = me.role === 'customer' && can(req, 'team') ? String(req.body.company || '').trim().slice(0, 100) || null : me.company;
+  const company = me.role === 'customer' && can(req, 'team') ? oneLine(req.body.company, 100) || null : me.company;
   if (!name) {
     flash(req, 'error', 'Enter your name.');
     return res.redirect('/dashboard/account');
@@ -320,12 +327,18 @@ router.post('/dashboard/account', requireLogin, (req, res) => {
   res.redirect('/dashboard/account');
 });
 
-router.post('/dashboard/account/password', requireLogin, async (req, res) => {
+const passwordLimit = limit('password', 10, 15 * 60 * 1000, (req, res) => {
+  flash(req, 'error', 'Too many tries. Wait 15 minutes and try again.');
+  res.redirect('/dashboard/account');
+});
+
+router.post('/dashboard/account/password', requireLogin, passwordLimit, async (req, res) => {
   const me = q.user.get(req.user.id);
   const current = String(req.body.current || '');
   const next = String(req.body.password || '');
   if (!(await bcrypt.compare(current, me.password_hash))) flash(req, 'error', "Your current password isn't right.");
   else if (next.length < 8) flash(req, 'error', 'Use at least 8 characters for the new password.');
+  else if (next.length > 200) flash(req, 'error', 'Use 200 characters or fewer.');
   else {
     q.setPassword.run(await bcrypt.hash(next, 11), me.id);
     // Every other device is logged out; this one stays logged in.

@@ -129,7 +129,9 @@ Then swap in the live keys: `fly secrets set STRIPE_SECRET_KEY=sk_live_... STRIP
 
 - **Job alerts:** emails every approved tradie whose trades, areas and work types match a new job. This is the main thing that gets quotes in fast.
 - **Quote and payment emails:** the customer hears about every quote. The tradie hears when they win, when the money is held, and when it's paid out. Losing quoters get a polite "job filled".
-- **Contact details** only appear once the customer has paid. Both sides get each other's phone and email at that point, not before. That keeps the job (and your fee) on the platform.
+- **Contact details** only appear once the customer has paid. Both sides get each other's phone and email at that point, not before. That keeps the job (and your fee) on the platform. Phone numbers, emails and web links are also refused in quotes, job descriptions, tradie profiles, photo captions, reviews and review replies, so nobody can slip them in early.
+- **Limits against abuse:** 10 jobs a day per customer account, 20 team invites a day per account, 3 password reset emails an hour per address, and login guessing is slowed per IP and per account. If a big customer needs more jobs a day, change `JOBS_PER_DAY` in `src/routes/jobs.js`.
+- **Refunds** give back the quote amount only. The secure payment fee is kept, since Stripe keeps its card fee on a refunded payment. The terms and the job page say so before anyone pays.
 - **Reminders, checked every hour:**
   - quotes waiting a day: nudges the customer
   - payment held 7 and 14 days: asks the customer if the job's done

@@ -223,3 +223,122 @@ test("odd input (multibyte tokens) is refused instead of crashing", async () => 
   const u = await browser().get('/unsubscribe?u=1&t=%E2%82%AC%E2%82%AC%E2%82%AC%E2%82%AC%E2%82%AC%E2%82%AC%E2%82%AC%E2%82%AC');
   assert.strictEqual(u.status, 404);
 });
+
+test('form options must be real ones, not built-in object names', async () => {
+  const before = one('SELECT COUNT(*) AS n FROM jobs').n;
+  await customer.get('/jobs/new?trade=tiling');
+  const res = await customer.form('/jobs', {
+    sector: 'constructor', title: 'Odd job here', trade: 'constructor', address: '1 Test St, Bayswater WA 6053',
+    description: 'Checking that made-up options are refused properly.', budget: 'toString', timing: '__proto__',
+  });
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(one('SELECT COUNT(*) AS n FROM jobs').n, before);
+  for (const u of [
+    '/jobs?trade=constructor', '/jobs?trade=tiling&trade=plumbing', '/jobs/new?trade=constructor&sector=__proto__',
+    '/start?path=need&who=constructor', '/start?path=tradie&trades=constructor,hasOwnProperty',
+    '/start?path=need&who=home&trade=plumbing&timing=urgent&region=__proto__', '/dashboard/jobs?tab=constructor',
+  ]) {
+    assert.strictEqual((await customer.get(u)).status, 200, u);
+  }
+});
+
+test('contact details are kept out of what others see before payment', async () => {
+  const { hasContactDetails } = require('../src/helpers');
+  for (const t of ['call 0412 345 678', '+61 412 345 678', '(08) 9123 4567', '1300 123 456', 'tia@tiatiles.com.au', 'tia @ gmail . com', 'www.tiatiles.com', 'tiatiles.com.au']) {
+    assert.ok(hasContactDetails(t), t);
+  }
+  for (const t of ['Price is $1,250 inc GST', 'Start 2026-10-14', 'ABN 51 824 753 556', 'Supply 20 tiles @ 45. Labour extra', 'Available 04/11/2026', '24/7 Plumbing']) {
+    assert.ok(!hasContactDetails(t), t);
+  }
+
+  await customer.get('/jobs/new?trade=tiling');
+  let res = await customer.form('/jobs', {
+    sector: 'housing', title: 'Regrout the ensuite', trade: 'tiling', address: '1 Test St, Bayswater WA 6053',
+    description: 'Grout is cracking around the shower base, call me on 0412 345 678.', budget: 'under-500', timing: 'flexible',
+  });
+  assert.strictEqual(res.status, 400);
+  assert.match(res.text, /Take out phone numbers/);
+
+  const tid = one("SELECT id FROM users WHERE email = 'tia@test.local'").id;
+  await tiler.get(`/jobs/${jobId}`);
+  await tiler.post(`/jobs/${jobId}/quotes`, { amount: '320', message: 'Happy to help, email me at tia@tiatiles.com.au' });
+  assert.strictEqual(one('SELECT amount_cents FROM quotes WHERE job_id = ? AND tradie_id = ?', jobId, tid).amount_cents, 30000);
+
+  await tiler.get('/dashboard/profile');
+  res = await tiler.post('/dashboard/profile', {
+    name: 'Tia', phone: '0400 123 456', business_name: 'Tia Tiles', abn: '51 824 753 556', sectors: 'housing',
+    trades: ['tiling', 'electrical'], regions: 'north-east', insurer: 'QBE', insurance_expiry: '2030-01-01', bio: 'More at www.tiatiles.com.au',
+  });
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(one('SELECT bio FROM tradie_profiles WHERE user_id = ?', tid).bio, null);
+});
+
+test('one account can only post so many jobs a day', async () => {
+  const cid = one("SELECT id FROM users WHERE email = 'cleo@test.local'").id;
+  const have = one("SELECT COUNT(*) AS n FROM jobs WHERE customer_id = ? AND created_at > datetime('now', '-1 day')", cid).n;
+  const add = db.prepare(`
+    INSERT INTO jobs (customer_id, sector, title, trade, suburb, postcode, region, description, budget, timing)
+    VALUES (?, 'housing', 'Filler job', 'tiling', 'Bayswater', '6053', 'north-east', 'Filler', 'under-500', 'flexible')`);
+  for (let i = have; i < 10; i++) add.run(cid);
+  await customer.get('/jobs/new?trade=tiling');
+  const res = await customer.form('/jobs', {
+    sector: 'housing', title: 'One job too many', trade: 'tiling', address: '1 Test St, Bayswater WA 6053',
+    description: 'This one should be over the daily limit for the account.', budget: 'under-500', timing: 'flexible',
+  });
+  assert.strictEqual(res.status, 400);
+  assert.match(res.text, /daily limit/);
+});
+
+test('reset emails to one address are capped, however many people ask', async () => {
+  const b = browser();
+  await signup(b, 'customer', 'Rae', 'rae@test.local');
+  for (let i = 0; i < 5; i++) {
+    const f = browser();
+    await f.get('/forgot');
+    await f.raw('/forgot', new URLSearchParams({ _csrf: f.csrf, email: 'rae@test.local' }).toString(), {
+      'content-type': 'application/x-www-form-urlencoded', 'x-forwarded-for': `10.0.0.${i + 1}`,
+    });
+  }
+  await require('../src/mailer').flush();
+  assert.strictEqual(one("SELECT COUNT(*) AS n FROM emails WHERE to_email = 'rae@test.local' AND kind = 'password_reset'").n, 3);
+});
+
+test("a manager can't change the owner's contact number", async () => {
+  await tiler.get('/team');
+  await tiler.post('/team/invite', { name: 'Ros', email: 'ros@test.local', role: 'manager' });
+  const token = (await tiler.get('/team')).text.match(/\/invite\/([A-Za-z0-9_-]+)/)[1];
+  const ros = browser();
+  await ros.get(`/invite/${token}`);
+  await ros.post(`/invite/${token}`, { name: 'Ros', password: 'longpassword' });
+  await ros.get('/dashboard/profile');
+  await ros.post('/dashboard/profile', {
+    name: 'Ros', phone: '0499 999 999', business_name: 'Tia Tiles', abn: '51 824 753 556', sectors: 'housing',
+    trades: ['tiling', 'electrical'], regions: 'north-east', insurer: 'QBE', insurance_expiry: '2030-01-01',
+  });
+  const owner = one("SELECT name, phone FROM users WHERE email = 'tia@test.local'");
+  assert.strictEqual(owner.phone, '0400 123 456');
+  assert.strictEqual(owner.name, 'Tia');
+});
+
+test('an image claiming to be enormous is refused before it is decoded', async () => {
+  const zlib = require('zlib');
+  const uploads = require('../src/uploads');
+  const png = await sharp({ create: { width: 10, height: 10, channels: 3, background: '#ffffff' } }).png().toBuffer();
+  // Rewrite the PNG header to say 9,000 x 9,000 pixels (81 megapixels), with a matching checksum.
+  png.writeUInt32BE(9000, 16);
+  png.writeUInt32BE(9000, 20);
+  png.writeUInt32BE(zlib.crc32(png.subarray(12, 29)), 29);
+  await assert.rejects(uploads.save({ buffer: png }), /pixel limit/);
+});
+
+test('password guessing on one account is slowed down across many addresses', async () => {
+  let res;
+  for (let i = 0; i < 31; i++) {
+    const f = browser();
+    await f.get('/login');
+    res = await f.raw('/login', new URLSearchParams({ _csrf: f.csrf, email: 'red@test.local', password: `wrong${i}` }).toString(), {
+      'content-type': 'application/x-www-form-urlencoded', 'x-forwarded-for': `10.1.${i}.1`,
+    });
+  }
+  assert.strictEqual(res.status, 429);
+});

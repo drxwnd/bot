@@ -291,7 +291,11 @@ function disputeOpened(dispute) {
 
 function disputeClosed(dispute) {
   const payment = paymentForStripe(dispute.charge, dispute.payment_intent);
-  if (payment && dispute.status === 'won') db.prepare('UPDATE payments SET disputed = 0 WHERE id = ?').run(payment.id);
+  if (!payment) return;
+  if (dispute.status === 'won') db.prepare('UPDATE payments SET disputed = 0 WHERE id = ?').run(payment.id);
+  // Lost: the bank has already taken the money back. It stays blocked from release, and if it was
+  // already paid out, the tradie's transfer needs reversing in Stripe.
+  else notify.adminAlert(`The card dispute on payment ${payment.id} (job ${payment.job_id}) closed as "${dispute.status}". The customer's bank has taken the money back. ${payment.status === 'released' ? 'It was already paid out, so reverse the transfer to the tradie in Stripe.' : "Don't release or refund it; mark the job sorted with the customer and tradie."}`);
 }
 
 // A refund made straight from the Stripe dashboard instead of our admin page. Refunds here leave

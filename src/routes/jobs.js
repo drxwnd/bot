@@ -6,7 +6,8 @@ const C = require('../constants');
 const payments = require('../payments');
 const uploads = require('../uploads');
 const notify = require('../notify');
-const { parseDollars, money } = require('../helpers');
+const { parseDollars, money, hasContactDetails, oneLine } = require('../helpers');
+const { limit } = require('../ratelimit');
 const seo = require('../seo');
 const { locate, errorMessage } = require('../locality');
 const { flash, verifyCsrf, requireLogin, requireRole, requireCan, requireApprovedTradie } = require('../middleware');
@@ -27,6 +28,10 @@ function requireJobAction(action, message) {
 // Smallest quote we take. Card fees make tiny jobs pointless, and Stripe won't charge under 50c.
 const MIN_QUOTE_CENTS = 2000;
 const MANAGER_ONLY = 'Only a manager or the account owner can do that. Ask them to take a look.';
+// Every job emails the matching tradies, so one account can only post so many a day.
+const JOBS_PER_DAY = 10;
+const NO_CONTACTS_CUSTOMER = "Take out phone numbers, emails and web links. Only the tradie you pay gets your contact details, and they get them straight away.";
+const NO_CONTACTS_TRADIE = "Take out phone numbers, emails and web links. The customer gets your contact details as soon as they pay.";
 
 const router = express.Router();
 
@@ -40,6 +45,7 @@ const q = {
     INSERT INTO jobs (customer_id, sector, title, trade, suburb, postcode, address, region, description, requirements, budget, timing)
     VALUES (@customer_id, @sector, @title, @trade, @suburb, @postcode, @address, @region, @description, @requirements, @budget, @timing)`),
   insertPhoto: db.prepare('INSERT INTO job_photos (job_id, filename) VALUES (?, ?)'),
+  postedToday: db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE customer_id = ? AND created_at > datetime('now', '-1 day')"),
   quotesForJob: db.prepare(`
     SELECT q.*, u.name AS tradie_name, u.email AS tradie_email, u.phone AS tradie_phone,
       p.business_name, p.licence_no, p.years_trading, p.insurer,
@@ -87,9 +93,9 @@ function ownsJob(req, res, next) {
 // ---- Job board ----
 
 router.get('/jobs', (req, res) => {
-  const trade = C.tradeName[req.query.trade] ? req.query.trade : '';
-  const region = C.regionName[req.query.region] ? req.query.region : '';
-  const sector = C.sectorName[req.query.sector] ? req.query.sector : '';
+  const trade = C.oneOf(C.tradeName, req.query.trade);
+  const region = C.oneOf(C.regionName, req.query.region);
+  const sector = C.oneOf(C.sectorName, req.query.sector);
   const where = ["j.status = 'open'"];
   const params = {};
   if (sector) { where.push('j.sector = @sector'); params.sector = sector; }
@@ -132,10 +138,10 @@ router.get('/jobs/new', (req, res) => {
   res.render('pages/job-new', {
     title: 'Post a job',
     values: {
-      trade: C.tradeName[req.query.trade] ? req.query.trade : '',
-      sector: C.sectorName[req.query.sector] ? req.query.sector : 'housing',
-      timing: C.timingName[req.query.timing] ? req.query.timing : '',
-      region: C.regionName[req.query.region] ? req.query.region : '',
+      trade: C.oneOf(C.tradeName, req.query.trade),
+      sector: C.oneOf(C.sectorName, req.query.sector, 'housing'),
+      timing: C.oneOf(C.timingName, req.query.timing),
+      region: C.oneOf(C.regionName, req.query.region),
     },
   });
 });
@@ -150,19 +156,19 @@ router.post(
     const b = req.body;
     const values = {
       customer_id: req.account.ownerId,
-      sector: C.sectorName[b.sector] ? b.sector : '',
-      title: String(b.title || '').trim().slice(0, 120),
-      trade: String(b.trade || ''),
+      sector: C.oneOf(C.sectorName, b.sector),
+      title: oneLine(b.title, 120),
+      trade: C.oneOf(C.tradeName, b.trade),
       address: String(b.address || '').trim().slice(0, 200),
       suburb: '',
       postcode: '',
       // Blank means "work it out from the address". Customers can override a wrong guess.
-      region: C.regionName[b.region] ? b.region : '',
+      region: C.oneOf(C.regionName, b.region),
       description: String(b.description || '').trim().slice(0, 5000),
       // Each sector has its own extra field on the form; keep only the one that matches.
-      requirements: String(b[`requirements_${b.sector}`] || '').trim().slice(0, 2000) || null,
-      budget: String(b.budget || ''),
-      timing: String(b.timing || ''),
+      requirements: String(b[`requirements_${C.oneOf(C.sectorName, b.sector)}`] || '').trim().slice(0, 2000) || null,
+      budget: C.oneOf(C.budgetName, b.budget),
+      timing: C.oneOf(C.timingName, b.timing),
     };
 
     let error = null;
@@ -175,6 +181,8 @@ router.post(
     else if (!C.budgetName[values.budget]) error = 'Pick a rough budget.';
     else if (config.maxQuoteCents && values.budget === 'over-50k') error = `For now we only take jobs up to ${money(config.maxQuoteCents)}. Bigger building jobs need a registered builder and a written contract.`;
     else if (!C.timingName[values.timing]) error = 'Pick when you need it done.';
+    else if (hasContactDetails(values.title, values.description, values.requirements)) error = NO_CONTACTS_CUSTOMER;
+    else if (q.postedToday.get(values.customer_id).n >= JOBS_PER_DAY) error = `You've posted ${JOBS_PER_DAY} jobs today, which is our daily limit. Email ${config.supportEmail} if you need more.`;
 
     if (!error) {
       const place = locate(values.address);
@@ -300,7 +308,7 @@ router.post('/jobs/:id/cancel', requireLogin, loadJob, ownsJob, requireJobAction
 
 // ---- Quotes ----
 
-router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requireApprovedTradie, loadJob, (req, res) => {
+router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requireApprovedTradie, limit('quote', 60, 60 * 60 * 1000), loadJob, (req, res) => {
   const job = req.job;
   if (job.status !== 'open') {
     flash(req, 'error', 'This job is no longer taking quotes.');
@@ -326,6 +334,8 @@ router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requ
     flash(req, 'error', `Quotes on ${config.siteName} are limited to ${money(config.maxQuoteCents)} for now. Bigger building jobs in WA need a registered builder and a written contract, so arrange those directly.`);
   } else if (message.length < 20) {
     flash(req, 'error', "Add a short note about what's included so the customer can compare quotes.");
+  } else if (hasContactDetails(message)) {
+    flash(req, 'error', NO_CONTACTS_TRADIE);
   } else {
     q.insertQuote.run(job.id, req.account.ownerId, amount, message, start);
     notify.quoteReceived(q.myQuote.get(job.id, req.account.ownerId).id);
@@ -435,13 +445,18 @@ router.post('/jobs/:id/review', requireLogin, loadJob, ownsJob, (req, res) => {
     return res.redirect(`/jobs/${job.id}#review`);
   }
   const rating = Number(req.body.rating);
+  const comment = String(req.body.comment || '').trim().slice(0, 2000) || null;
   if (job.status !== 'completed' || q.review.get(job.id)) return res.redirect(`/jobs/${job.id}`);
-  if (!(rating >= 1 && rating <= 5)) {
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     flash(req, 'error', 'Pick a star rating.');
     return res.redirect(`/jobs/${job.id}#review`);
   }
+  if (hasContactDetails(comment)) {
+    flash(req, 'error', 'Leave phone numbers, emails and web links out of the review. It goes on the public profile.');
+    return res.redirect(`/jobs/${job.id}#review`);
+  }
   const quote = q.quote.get(job.accepted_quote_id);
-  q.insertReview.run(job.id, quote.tradie_id, job.customer_id, rating, String(req.body.comment || '').trim().slice(0, 2000) || null);
+  q.insertReview.run(job.id, quote.tradie_id, job.customer_id, rating, comment);
   flash(req, 'success', 'Thanks, your review is up.');
   res.redirect(`/jobs/${job.id}`);
 });

@@ -78,6 +78,29 @@ function list(value) {
   return [value];
 }
 
+// Contact details in text that other people see before a job is paid (quotes, job descriptions, profiles,
+// reviews). Phone numbers, emails and the full address are swapped once the customer pays; a number in
+// a quote lets both sides arrange the job off the site, so these are refused.
+const CONTACT_PATTERNS = [
+  // Australian mobiles and landlines, with or without +61, spaces, dots, dashes or brackets.
+  /(?:\+\s*61[\s.\-()]*0?|\(?(?<!\d)0[\s.\-]*)[2-478]\)?(?:[\s.\-]*\d){8}(?!\d)/,
+  // 1300 and 1800 numbers.
+  /(?<!\d)1[38]00(?:[\s.\-]*\d){6}(?!\d)/,
+  // Email addresses, including "name @ gmail . com".
+  /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/i,
+  /[a-z0-9._%+-]+\s*@\s*[a-z][a-z0-9-]*\s*\.\s*(?:com|net|org|au|io|co)\b/i,
+  // Web links and website names.
+  /\bhttps?:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|net|org|biz|info|io|co|au)(?:\.au)?\b/i,
+];
+function hasContactDetails(...texts) {
+  return texts.some((t) => t && CONTACT_PATTERNS.some((re) => re.test(String(t))));
+}
+
+// Single-line text (titles, names): line breaks and tabs become spaces.
+function oneLine(value, max) {
+  return String(value ?? '').replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
 const STATUS_LABEL = {
   open: 'Taking quotes',
   awarded: 'Quote accepted',
@@ -97,6 +120,8 @@ module.exports = {
   formatAbn,
   validAbn,
   list,
+  hasContactDetails,
+  oneLine,
   STATUS_LABEL,
   locals: { money, feeFor, customerFeeFor, feeLabel, customerFeePercent: config.customerFeePercent, ago, shortDate, formatAbn, STATUS_LABEL, ...C },
 };

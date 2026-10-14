@@ -138,4 +138,7 @@ const REGION_INFO = {
   kimberley: { name: "the Kimberley", places: ['Broome', 'Kununurra', 'Derby', 'Fitzroy Crossing', 'Halls Creek', 'Wyndham'], note: 'Remote, with a short dry-season window for a lot of work. Tourism and accommodation keep Broome busy.' },
 };
 
+Object.setPrototypeOf(TRADE_INFO, null);
+Object.setPrototypeOf(REGION_INFO, null);
+
 module.exports = { TRADE_INFO, REGION_INFO };

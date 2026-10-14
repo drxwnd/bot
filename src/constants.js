@@ -86,7 +86,13 @@ const BUDGETS = [
   { slug: 'unsure', name: 'Not sure yet' },
 ];
 
-const lookup = (list) => Object.fromEntries(list.map((x) => [x.slug, x.name]));
+// Lookups have no prototype, so "constructor" or "__proto__" from a form never counts as a valid option.
+const dict = (obj) => Object.assign(Object.create(null), obj);
+const lookup = (list) => dict(Object.fromEntries(list.map((x) => [x.slug, x.name])));
+
+// The value if it's one of the map's own keys, otherwise the fallback. Repeated form fields arrive as
+// arrays, which are refused too.
+const oneOf = (map, value, fallback = '') => (typeof value === 'string' && Object.hasOwn(map, value) ? value : fallback);
 
 module.exports = {
   TRADES,
@@ -97,8 +103,10 @@ module.exports = {
   BUDGETS,
   tradeName: lookup(TRADES),
   sectorName: lookup(SECTORS),
-  sectorBySlug: Object.fromEntries(SECTORS.map((x) => [x.slug, x])),
+  sectorBySlug: dict(Object.fromEntries(SECTORS.map((x) => [x.slug, x]))),
   regionName: lookup(REGIONS),
   timingName: lookup(TIMINGS),
   budgetName: lookup(BUDGETS),
+  dict,
+  oneOf,
 };

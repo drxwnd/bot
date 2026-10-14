@@ -11,6 +11,10 @@ const { TEAM_ROLES, ROLE_NAMES } = require('../permissions');
 const { flash, requireCan, logIn, logOutEverywhere } = require('../middleware');
 const { limit } = require('../ratelimit');
 const notify = require('../notify');
+const { oneLine } = require('../helpers');
+
+// Each invite is an email from us to an address someone typed in, so an account can only send so many a day.
+const INVITES_PER_DAY = 20;
 
 const router = express.Router();
 
@@ -22,6 +26,7 @@ const q = {
   // Invites work for 14 days.
   byToken: db.prepare("SELECT * FROM team_members WHERE token = ? AND status = 'invited' AND created_at > datetime('now', '-14 days')"),
   pendingForEmail: db.prepare("SELECT id FROM team_members WHERE account_id = ? AND email = ? AND status != 'removed'"),
+  invitedToday: db.prepare("SELECT COUNT(*) AS n FROM team_members WHERE account_id = ? AND created_at > datetime('now', '-1 day')"),
   insert: db.prepare('INSERT INTO team_members (account_id, email, name, role, token) VALUES (?, ?, ?, ?, ?)'),
   setRole: db.prepare('UPDATE team_members SET role = ? WHERE id = ?'),
   remove: db.prepare("UPDATE team_members SET status = 'removed', token = NULL, user_id = NULL WHERE id = ?"),
@@ -52,8 +57,8 @@ router.get('/team', requireCan('team'), (req, res) => {
 
 router.post('/team/invite', requireCan('team'), limit('team-invite', 30, 60 * 60 * 1000), (req, res) => {
   const kind = kindOf(req);
-  const email = String(req.body.email || '').trim().toLowerCase();
-  const name = String(req.body.name || '').trim().slice(0, 80);
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 200);
+  const name = oneLine(req.body.name, 80);
   const role = TEAM_ROLES[kind].find((r) => r.slug === req.body.role) ? req.body.role : null;
 
   let error = null;
@@ -62,6 +67,7 @@ router.post('/team/invite', requireCan('team'), limit('team-invite', 30, 60 * 60
   else if (!role) error = 'Pick a role.';
   else if (q.userByEmail.get(email)) error = 'That email already has its own Tradebench account. Use a different email for their team login.';
   else if (q.pendingForEmail.get(req.account.ownerId, email)) error = "They're already on your team or have an invite waiting.";
+  else if (q.invitedToday.get(req.account.ownerId).n >= INVITES_PER_DAY) error = `You can send up to ${INVITES_PER_DAY} invites a day. Try again tomorrow.`;
 
   if (error) {
     flash(req, 'error', error);
@@ -148,8 +154,8 @@ router.get('/invite/:token', loadInvite, (req, res) => {
 router.post('/invite/:token', limit('invite', 20, 60 * 60 * 1000), loadInvite, async (req, res) => {
   const invite = req.invite;
   const owner = req.inviteOwner;
-  const name = String(req.body.name || '').trim().slice(0, 80);
-  const phone = String(req.body.phone || '').trim() || null;
+  const name = oneLine(req.body.name, 80);
+  const phone = oneLine(req.body.phone, 30) || null;
   const password = String(req.body.password || '');
 
   const render = (error) =>
@@ -164,6 +170,7 @@ router.post('/invite/:token', limit('invite', 20, 60 * 60 * 1000), loadInvite, a
 
   if (!name) return render('Enter your name.');
   if (password.length < 8) return render('Use at least 8 characters for your password.');
+  if (password.length > 200) return render('Use 200 characters or fewer for your password.');
   if (q.userByEmail.get(invite.email)) return render('That email already has an account. Ask for an invite to a different email.');
 
   const hash = await bcrypt.hash(password, 11);

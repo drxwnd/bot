@@ -3,7 +3,7 @@ const db = require('../db');
 const C = require('../constants');
 const payments = require('../payments');
 const notify = require('../notify');
-const { validAbn, list } = require('../helpers');
+const { validAbn, list, hasContactDetails, oneLine } = require('../helpers');
 const { flash, requireLogin, requireRole, requireCan, verifyCsrf } = require('../middleware');
 const uploads = require('../uploads');
 const { can } = require('../permissions');
@@ -21,6 +21,9 @@ const q = {
   updateUser: db.prepare('UPDATE users SET name = ?, phone = ? WHERE id = ?'),
   recheck: db.prepare("UPDATE tradie_profiles SET status = 'pending' WHERE user_id = ?"),
 };
+
+// A real calendar date in YYYY-MM-DD form.
+const isRealDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
 
 // Changes to these need checking again before the tradie can keep quoting.
 function needsRecheck(before, values) {
@@ -95,7 +98,8 @@ router.post(
         const room = MAX_WORK_PHOTOS - photoQ.count.get(id).n;
         const files = (req.files || []).slice(0, Math.max(0, room));
         if (!files.length) throw Object.assign(new Error(), { friendly: room <= 0 ? `You can have up to ${MAX_WORK_PHOTOS} photos. Remove some first.` : 'Choose some photos to add.' });
-        const caption = String(req.body.caption || '').trim().slice(0, 120) || null;
+        const caption = oneLine(req.body.caption, 120) || null;
+        if (hasContactDetails(caption)) throw Object.assign(new Error(), { friendly: 'Leave phone numbers, emails and web links out of the caption.' });
         const { saved, skipped } = await uploads.saveAll(files);
         for (const f of saved) photoQ.add.run(id, f, caption);
         flash(req, skipped ? 'info' : 'success', skipped ? uploads.UNREADABLE : `${saved.length} photo${saved.length === 1 ? '' : 's'} added to your profile.`);
@@ -137,11 +141,15 @@ router.get('/dashboard/profile', requireRole('tradie'), requireCan('profile'), (
 
 router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), (req, res) => {
   const b = req.body;
+  const owner = req.account.owner;
+  // The name and phone are the owner's own. Customers get that phone once they pay, so only the
+  // owner can change it, not a manager.
+  const isOwner = req.account.role === 'owner';
   const values = {
     user_id: req.account.ownerId,
-    name: String(b.name || '').trim(),
-    phone: String(b.phone || '').trim(),
-    business_name: String(b.business_name || '').trim().slice(0, 100),
+    name: isOwner ? oneLine(b.name, 80) : owner.name,
+    phone: isOwner ? oneLine(b.phone, 30) : owner.phone || '',
+    business_name: oneLine(b.business_name, 100),
     abn: String(b.abn || '').replace(/\s/g, ''),
     sectors: list(b.sectors).filter((s) => C.sectorName[s]),
     trades: list(b.trades).filter((t) => C.tradeName[t]),
@@ -149,7 +157,7 @@ router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), 
     licence_no: String(b.licence_no || '').trim().slice(0, 50) || null,
     tickets: String(b.tickets || '').trim().slice(0, 1000) || null,
     insurer: String(b.insurer || '').trim().slice(0, 100) || null,
-    insurance_expiry: /^\d{4}-\d{2}-\d{2}$/.test(b.insurance_expiry || '') ? b.insurance_expiry : null,
+    insurance_expiry: isRealDate(b.insurance_expiry) ? b.insurance_expiry : null,
     years_trading: Number.isInteger(Number(b.years_trading)) && b.years_trading !== '' ? Number(b.years_trading) : null,
     bio: String(b.bio || '').trim().slice(0, 1500) || null,
   };
@@ -162,6 +170,9 @@ router.post('/dashboard/profile', requireRole('tradie'), requireCan('profile'), 
   else if (!values.trades.length) error = 'Pick at least one trade.';
   else if (!values.regions.length) error = "Pick the areas you'll travel to.";
   else if (!values.insurer || !values.insurance_expiry) error = 'We need your public liability insurer and expiry date.';
+  else if (hasContactDetails(values.business_name, values.bio, values.tickets)) {
+    error = 'Take out phone numbers, emails and web links. Customers get your contact details as soon as they pay.';
+  }
 
   if (error) return res.status(400).render('pages/profile-edit', { title: 'Business details', values, error });
 

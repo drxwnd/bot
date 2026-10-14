@@ -10,14 +10,16 @@
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <% if (typeof error !== 'undefined') { %><div class="notice error"><%= error %></div><% } %>
 
+      <% const ownerOnly = account.role !== 'owner'; %>
       <div class="row">
         <div class="field">
-          <label for="name">Your name</label>
-          <input id="name" name="name" type="text" required value="<%= values.name || '' %>">
+          <label for="name"><%= ownerOnly ? "Owner's name" : 'Your name' %></label>
+          <input id="name" name="name" type="text" required value="<%= values.name || '' %>"<%= ownerOnly ? ' readonly' : '' %>>
         </div>
         <div class="field">
           <label for="phone">Mobile</label>
-          <input id="phone" name="phone" type="tel" required value="<%= values.phone || '' %>">
+          <input id="phone" name="phone" type="tel" required value="<%= values.phone || '' %>"<%= ownerOnly ? ' readonly' : '' %>>
+          <% if (ownerOnly) { %><span class="hint">Only the account owner can change their name and number.</span><% } %>
         </div>
       </div>
 

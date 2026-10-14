@@ -12,6 +12,7 @@ const express = require('express');
 const db = require('../db');
 const config = require('../config');
 const { parseDollars, feeFor } = require('../helpers');
+const { oneOf } = require('../constants');
 const { can } = require('../permissions');
 const { flash, verifyCsrf, requireRole, requireCan } = require('../middleware');
 const uploads = require('../uploads');
@@ -164,6 +165,26 @@ const q = {
     UPDATE tradie_profiles SET hourly_rate_cents = @hourly_rate_cents, gst_registered = @gst_registered,
       invoice_prefix = @invoice_prefix, payment_details = @payment_details WHERE user_id = @user_id`),
 };
+
+// Note photos used to be saved in the public uploads folder. Move any left there into private storage,
+// so they're only reachable through the team-only photo link.
+(function moveOldNotePhotos() {
+  for (const { photo } of db.prepare('SELECT photo FROM work_notes WHERE photo IS NOT NULL').all()) {
+    for (const name of [photo, photo.replace('.jpg', '-sm.jpg')]) {
+      if (!/^[a-f0-9]{24}(-sm)?\.(jpg|png|webp|heic)$/.test(name)) continue;
+      const from = path.join(config.uploadDir, name);
+      const to = path.join(uploads.privateDir, name);
+      try {
+        if (fs.existsSync(from) && !fs.existsSync(to)) fs.renameSync(from, to);
+      } catch (err) {
+        if (err.code === 'EXDEV') {
+          fs.copyFileSync(from, to);
+          fs.rmSync(from, { force: true });
+        } else console.error(`Could not move note photo ${name}:`, err.message);
+      }
+    }
+  }
+})();
 
 function sync(accountId) {
   q.syncWon.run(accountId);
@@ -338,7 +359,7 @@ router.post('/work/:id', requireCan('work.manage'), loadWork, (req, res) => {
   const team = q.team.all({ account: req.account.ownerId });
   const update = {
     id: req.work.id,
-    status: STATUS[b.status] ? b.status : req.work.status,
+    status: oneOf(STATUS, b.status, req.work.status),
     assigned_to: team.some((t) => t.id === Number(b.assigned_to)) ? Number(b.assigned_to) : null,
     scheduled_date: isDate(b.scheduled_date) ? b.scheduled_date : null,
     scheduled_time: isTime(b.scheduled_time) ? b.scheduled_time : null,
@@ -462,10 +483,11 @@ router.post('/work/:id/invoice', requireCan('money'), loadWork, (req, res) => {
   const lines = descs
     .map((d, i) => ({
       description: String(d || '').trim().slice(0, 200),
-      quantity: Number(qtys[i]),
+      quantity: Math.round(Number(qtys[i]) * 100) / 100,
       unit_price_cents: parseDollars(prices[i]),
     }))
-    .filter((l) => l.description && l.quantity > 0 && l.unit_price_cents);
+    .filter((l) => l.description && l.quantity > 0 && l.quantity <= 10000 && l.unit_price_cents)
+    .slice(0, 100);
 
   if (!lines.length) {
     flash(req, 'error', 'Add at least one line with a description, quantity and price.');

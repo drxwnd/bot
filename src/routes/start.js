@@ -19,16 +19,16 @@ const WHO = [
   { slug: 'hotel', name: 'Hotel, motel or short-stay', hint: 'Rooms, common areas and grounds', sector: 'hotels' },
   { slug: 'mining', name: 'Mining company or contractor', hint: 'Camps, workshops, site offices', sector: 'mining' },
 ];
-const WHO_BY = Object.fromEntries(WHO.map((w) => [w.slug, w]));
+const WHO_BY = C.dict(Object.fromEntries(WHO.map((w) => [w.slug, w])));
 
 // Trades people in each sector most often need, shown first.
-const POPULAR = {
+const POPULAR = C.dict({
   housing: ['plumbing', 'electrical', 'tiling', 'painting', 'roofing', 'aircon', 'handyman', 'carpentry'],
   hotels: ['aircon', 'plumbing', 'electrical', 'tiling', 'painting', 'locksmith', 'appliances', 'handyman'],
   mining: ['aircon', 'electrical', 'plumbing', 'welding', 'fitting', 'scaffolding', 'carpentry', 'concreting'],
-};
+});
 
-const PATHS = { need: true, tradie: true };
+const PATHS = C.dict({ need: true, tradie: true });
 const TIMING_HINTS = {
   urgent: "We'll flag it as urgent to tradies.",
   'two-weeks': '',
@@ -51,8 +51,8 @@ const q = {
 
 // Reads the answers so far from the query string, dropping anything that isn't a valid option.
 function readState(query) {
-  const pick = (value, valid) => (valid[value] ? value : '');
-  const many = (value, valid) => [...new Set(String(value || '').split(','))].filter((v) => valid[v]);
+  const pick = (value, valid) => C.oneOf(valid, value);
+  const many = (value, valid) => [...new Set(String(value || '').split(','))].filter((v) => Object.hasOwn(valid, v));
   return {
     path: pick(query.path, PATHS),
     who: pick(query.who, WHO_BY),

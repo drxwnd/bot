@@ -7,6 +7,7 @@ const { flash, logIn, logOutEverywhere, safeEqual } = require('../middleware');
 const { limit } = require('../ratelimit');
 const notify = require('../notify');
 const { unsubscribeToken } = require('../emails');
+const { oneLine } = require('../helpers');
 
 const router = express.Router();
 
@@ -27,6 +28,14 @@ function throttled(key) {
   }
   return rec;
 }
+
+// Compared against when the email isn't found, so a wrong email takes as long as a wrong password
+// and the timing doesn't give away who has an account.
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 11);
+
+// Failed logins on one email from any number of IPs. High enough that it takes a determined effort to
+// lock someone out, low enough to stop password guessing spread across many addresses.
+const EMAIL_FAILURES = 30;
 
 // Only ever redirect to a path on this site. Backslashes and control characters are refused because
 // browsers treat "/\\evil.com" like "//evil.com".
@@ -56,20 +65,22 @@ router.post('/login', loginLimit, async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const password = String(req.body.password || '');
   const rec = throttled(`${req.ip}|${email}`);
+  const forEmail = throttled(`email|${email}`);
 
-  if (rec.n >= 8) {
+  if (rec.n >= 8 || forEmail.n >= EMAIL_FAILURES) {
     return res.status(429).render('pages/login', {
       title: 'Log in',
       next: req.body.next,
       email,
-      error: 'Too many attempts. Wait 15 minutes and try again.',
+      error: 'Too many attempts. Wait 15 minutes and try again, or reset your password.',
     });
   }
 
   const user = findByEmail.get(email);
-  const ok = user && (await bcrypt.compare(password, user.password_hash));
-  if (!ok) {
+  const ok = await bcrypt.compare(password.slice(0, 200), user ? user.password_hash : DUMMY_HASH);
+  if (!ok || !user) {
     rec.n += 1;
+    forEmail.n += 1;
     return res.status(401).render('pages/login', {
       title: 'Log in',
       next: req.body.next,
@@ -92,10 +103,10 @@ router.get('/signup', (req, res) => {
 router.post('/signup', signupLimit, async (req, res) => {
   const as = req.body.as === 'tradie' ? 'tradie' : 'customer';
   const values = {
-    name: String(req.body.name || '').trim(),
-    email: String(req.body.email || '').trim().toLowerCase(),
-    phone: String(req.body.phone || '').trim(),
-    company: String(req.body.company || '').trim().slice(0, 100),
+    name: oneLine(req.body.name, 80),
+    email: String(req.body.email || '').trim().toLowerCase().slice(0, 200),
+    phone: oneLine(req.body.phone, 30),
+    company: oneLine(req.body.company, 100),
   };
   const password = String(req.body.password || '');
 
@@ -104,6 +115,7 @@ router.post('/signup', signupLimit, async (req, res) => {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) error = 'Enter a valid email address.';
   else if (as === 'tradie' && !/^[\d\s+()-]{8,}$/.test(values.phone)) error = 'Enter a phone number customers can reach you on.';
   else if (password.length < 8) error = 'Use at least 8 characters for your password.';
+  else if (password.length > 200) error = 'Use 200 characters or fewer for your password.';
   else if (findByEmail.get(values.email)) error = 'There is already an account with that email. Try logging in.';
 
   if (error) {
@@ -140,6 +152,7 @@ router.post('/signup', signupLimit, async (req, res) => {
 const resets = {
   insert: db.prepare("INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, datetime('now', '+1 hour'))"),
   find: db.prepare("SELECT * FROM password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')"),
+  recent: db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE user_id = ? AND expires_at > datetime('now')"),
   useAll: db.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE user_id = ? AND used_at IS NULL"),
   setPassword: db.prepare('UPDATE users SET password_hash = ? WHERE id = ?'),
   user: db.prepare('SELECT * FROM users WHERE id = ?'),
@@ -160,8 +173,9 @@ router.post('/forgot', limit('forgot', 10, 60 * 60 * 1000), (req, res) => {
   }
   rec.n += 1;
   const user = findByEmail.get(email);
-  // A removed team member's login is disabled with '!' and can't be brought back this way.
-  if (user && user.password_hash !== '!') {
+  // A removed team member's login is disabled with '!' and can't be brought back this way. At most
+  // three links an hour go to one address, however many people ask, so it can't be used to flood an inbox.
+  if (user && user.password_hash !== '!' && resets.recent.get(user.id).n < 3) {
     const token = crypto.randomBytes(24).toString('base64url');
     resets.insert.run(hashToken(token), user.id);
     notify.passwordReset(user, `${config.siteUrl}/reset/${token}`);
@@ -190,8 +204,8 @@ router.get('/reset/:token', loadReset, (req, res) => {
 
 router.post('/reset/:token', loadReset, async (req, res) => {
   const password = String(req.body.password || '');
-  if (password.length < 8) {
-    return res.status(400).render('pages/reset', { title: 'Choose a new password', token: req.params.token, error: 'Use at least 8 characters.' });
+  if (password.length < 8 || password.length > 200) {
+    return res.status(400).render('pages/reset', { title: 'Choose a new password', token: req.params.token, error: 'Use between 8 and 200 characters.' });
   }
   const hash = await bcrypt.hash(password, 11);
   db.transaction(() => {

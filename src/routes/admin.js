@@ -81,7 +81,7 @@ const FLYERS = {
 };
 
 router.get('/flyer/:who', async (req, res, next) => {
-  const flyer = FLYERS[req.params.who];
+  const flyer = Object.hasOwn(FLYERS, req.params.who) ? FLYERS[req.params.who] : null;
   if (!flyer) return next();
   const target = `${config.siteUrl}${flyer.path}?utm_source=${flyer.source}`;
   const qr = await QRCode.toString(target, { type: 'svg', margin: 0, errorCorrectionLevel: 'M', color: { dark: '#1c1b18', light: '#0000' } });
