@@ -149,7 +149,11 @@ test('job alerts, fees, contact details and reminders', async () => {
   await mailer.flush();
   assert.strictEqual(emailsTo('cleo@test.local', 'reminder_quotes').length, 1);
 
-  await customer.get(`/jobs/${jobId}`);
+  // The quote shows what the customer would actually pay, with the parts spelled out.
+  page = await customer.get(`/jobs/${jobId}`);
+  assert.match(page.text, /\$204\.00<small>total<\/small>/);
+  assert.match(page.text, /\$200\.00 quote<\/span> <span>\+ \$4\.00 payment fee/);
+  assert.ok(emailsTo('cleo@test.local', 'quote_received').some((e) => /\$204\.00/.test(e.subject) && /\$200\.00 for the job plus a \$4\.00 secure payment fee/.test(e.body_text)));
   await customer.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents) });
   page = await customer.get(`/jobs/${jobId}`);
   assert.match(page.text, /Pay \$204\.00 to lock it in/);

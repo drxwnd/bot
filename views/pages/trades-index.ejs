@@ -1,7 +1,7 @@
 <%- include('../partials/head') %>
 <div class="wrap page">
   <h1>Find a tradie by trade</h1>
-  <p class="muted" style="max-width:620px;font-size:1.08rem">Every tradie on <%= siteName %> has a checked ABN and insurance. Pick a trade to see who covers your area.</p>
+  <p class="muted" style="max-width:620px;font-size:1.08rem">Every tradie on <%= siteName %> has had their ABN, insurance and any licence their trade needs checked. Pick a trade to see who covers your area.</p>
   <ul class="trade-list" style="margin-top:32px">
     <% trades.forEach(t => { %><li><a href="/trades/<%= t.slug %>"><%= TRADE_INFO[t.slug].plural %></a></li><% }) %>
   </ul>

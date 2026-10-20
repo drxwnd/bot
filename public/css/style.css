@@ -1153,6 +1153,28 @@ ol.steps {
   font-size: 1.25rem;
   font-weight: 700;
   white-space: nowrap;
+  text-align: right;
+}
+
+.quote-amt small {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+/* "$845.00 quote + $16.90 payment fee" under the total */
+.quote-split {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: normal;
+}
+
+/* On a narrow screen it breaks between the two parts, never inside one. */
+.quote-split span {
+  white-space: nowrap;
 }
 
 .quote-body {
@@ -1731,6 +1753,24 @@ form:has(input[name='sector'][value='mining']:checked) .sector-extra-mining {
 
 .locate-preview.is-error {
   color: var(--warn);
+}
+
+.locate-match {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2);
+}
+
+/* A heading inside a long form, e.g. "Your details" on the job form */
+.field-intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.field-intro h2 {
+  margin: 0;
+  font-size: 1.25rem;
 }
 
 /* Get-started quiz */

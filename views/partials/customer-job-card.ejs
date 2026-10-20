@@ -1,6 +1,6 @@
 <%
   const stage = { open: 1, awarded: 2, paid: 3, completed: 4, cancelled: 0 }[j.status];
-  const next = j.status === 'open' ? (j.quote_count ? `${j.quote_count} quote${j.quote_count === 1 ? '' : 's'}${j.lowest_quote ? ', from ' + money(j.lowest_quote) : ''}` : 'Waiting for quotes')
+  const next = j.status === 'open' ? (j.quote_count ? `${j.quote_count} quote${j.quote_count === 1 ? '' : 's'}${j.lowest_quote ? ', from ' + money(j.lowest_quote + customerFeeFor(j.lowest_quote)) : ''}` : 'Waiting for quotes')
     : j.status === 'awarded' ? `Pay ${j.tradie_business} to lock it in`
     : j.status === 'paid' ? `${j.tradie_business} is on it. Money held.`
     : j.status === 'completed' ? (j.reviewed ? `Done by ${j.tradie_business}` : `Done. Leave ${j.tradie_business} a review`)

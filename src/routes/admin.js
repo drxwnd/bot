@@ -77,7 +77,7 @@ router.get('/', (req, res) => {
 // Open in a browser and print, or "Save as PDF".
 const FLYERS = {
   tradies: { path: '/for-tradies', source: 'flyer-tradies' },
-  customers: { path: '/start', source: 'flyer-customers' },
+  customers: { path: '/jobs/new', source: 'flyer-customers' },
 };
 
 router.get('/flyer/:who', async (req, res, next) => {

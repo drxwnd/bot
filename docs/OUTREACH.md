@@ -29,7 +29,7 @@ Ring agencies near where your tradies are. Ask for whoever handles maintenance.
 >
 > Hi [name],
 >
-> Thanks for the chat. Here's the link to post your next job: trade-bench.com/start
+> Thanks for the chat. Here's the link to post your next job: trade-bench.com/jobs/new
 >
 > - Free to post. Quotes from local tradies whose ABN, licence and insurance we've checked.
 > - Your payment is held until you sign the job off.

@@ -7,14 +7,11 @@ const { flash, logIn, logOutEverywhere, safeEqual } = require('../middleware');
 const { limit } = require('../ratelimit');
 const notify = require('../notify');
 const { unsubscribeToken } = require('../emails');
-const { oneLine } = require('../helpers');
+const accounts = require('../accounts');
 
 const router = express.Router();
 
 const findByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
-const insertUser = db.prepare(
-  'INSERT INTO users (email, password_hash, name, phone, role, company, customer_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
-);
 
 // Small in-memory throttle on login attempts per IP + email.
 const attempts = new Map();
@@ -100,44 +97,34 @@ router.get('/signup', (req, res) => {
   res.render('pages/signup', { title: as === 'tradie' ? 'Join as a tradie' : 'Create an account', as, values: {}, next: req.query.next || '' });
 });
 
-router.post('/signup', signupLimit, async (req, res) => {
+router.post('/signup', signupLimit, async (req, res, next) => {
   const as = req.body.as === 'tradie' ? 'tradie' : 'customer';
-  const values = {
-    name: oneLine(req.body.name, 80),
-    email: String(req.body.email || '').trim().toLowerCase().slice(0, 200),
-    phone: oneLine(req.body.phone, 30),
-    company: oneLine(req.body.company, 100),
-  };
+  const values = accounts.read(req.body);
   const password = String(req.body.password || '');
-
-  let error = null;
-  if (!values.name) error = 'Enter your name.';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) error = 'Enter a valid email address.';
-  else if (as === 'tradie' && !/^[\d\s+()-]{8,}$/.test(values.phone)) error = 'Enter a phone number customers can reach you on.';
-  else if (password.length < 8) error = 'Use at least 8 characters for your password.';
-  else if (password.length > 200) error = 'Use 200 characters or fewer for your password.';
-  else if (findByEmail.get(values.email)) error = 'There is already an account with that email. Try logging in.';
-
-  if (error) {
-    return res.status(400).render('pages/signup', {
+  const fail = (error) =>
+    res.status(400).render('pages/signup', {
       title: as === 'tradie' ? 'Join as a tradie' : 'Create an account',
       as,
       values,
       next: req.body.next,
       error,
     });
-  }
+
+  const error = accounts.problem(values, password, as);
+  if (error) return fail(error);
 
   // Outside production, signing up with ADMIN_EMAIL makes you the admin, which keeps local testing
   // simple. In production admins are made with `node scripts/make-admin.js`, so nobody can claim
   // the admin account by signing up with that address first.
   const role = !config.isProd && config.adminEmail && values.email === config.adminEmail ? 'admin' : as;
-  const hash = await bcrypt.hash(password, 11);
-  const company = role === 'tradie' ? null : values.company || null;
-  const intent = req.session.intent || {};
-  const customerType = role === 'customer' && intent.path === 'need' ? intent.who : null;
-  const info = insertUser.run(values.email, hash, values.name, values.phone || null, role, company, customerType);
-  logIn(req, Number(info.lastInsertRowid));
+  let userId;
+  try {
+    userId = accounts.insert(values, await accounts.hash(password), role);
+  } catch (err) {
+    if (accounts.isTaken(err)) return fail(accounts.TAKEN);
+    return next(err);
+  }
+  logIn(req, userId);
 
   if (role === 'tradie') {
     flash(req, 'success', 'Account created. Now tell us about your business so we can check you over.');

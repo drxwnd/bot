@@ -235,11 +235,13 @@ test('form options must be real ones, not built-in object names', async () => {
   assert.strictEqual(one('SELECT COUNT(*) AS n FROM jobs').n, before);
   for (const u of [
     '/jobs?trade=constructor', '/jobs?trade=tiling&trade=plumbing', '/jobs/new?trade=constructor&sector=__proto__',
-    '/start?path=need&who=constructor', '/start?path=tradie&trades=constructor,hasOwnProperty',
-    '/start?path=need&who=home&trade=plumbing&timing=urgent&region=__proto__', '/dashboard/jobs?tab=constructor',
+    '/start?path=tradie&trades=constructor,hasOwnProperty', '/dashboard/jobs?tab=constructor',
   ]) {
     assert.strictEqual((await customer.get(u)).status, 200, u);
   }
+  // Old customer-question links go to the job form, carrying only real options.
+  const r = await customer.get('/start?path=need&who=constructor&trade=plumbing&timing=urgent&region=__proto__');
+  assert.strictEqual(r.location, '/jobs/new?trade=plumbing&timing=urgent');
 });
 
 test('contact details are kept out of what others see before payment', async () => {

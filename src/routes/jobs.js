@@ -8,9 +8,10 @@ const uploads = require('../uploads');
 const notify = require('../notify');
 const { parseDollars, money, hasContactDetails, oneLine } = require('../helpers');
 const { limit } = require('../ratelimit');
+const accounts = require('../accounts');
 const seo = require('../seo');
 const { locate, errorMessage } = require('../locality');
-const { flash, verifyCsrf, requireLogin, requireRole, requireCan, requireApprovedTradie } = require('../middleware');
+const { flash, verifyCsrf, logIn, requireLogin, requireRole, requireCan, requireApprovedTradie } = require('../middleware');
 const { can } = require('../permissions');
 
 // Customer-side actions on a job. Admins act with the money permission instead.
@@ -46,6 +47,13 @@ const q = {
     VALUES (@customer_id, @sector, @title, @trade, @suburb, @postcode, @address, @region, @description, @requirements, @budget, @timing)`),
   insertPhoto: db.prepare('INSERT INTO job_photos (job_id, filename) VALUES (?, ?)'),
   postedToday: db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE customer_id = ? AND created_at > datetime('now', '-1 day')"),
+  // Approved tradies who'd be told about a job like this one (see notify.jobPosted).
+  tradiesFor: db.prepare(`
+    SELECT COUNT(*) AS n FROM tradie_profiles
+    WHERE status = 'approved'
+      AND (',' || trades || ',') LIKE ('%,' || @trade || ',%')
+      AND (',' || regions || ',') LIKE ('%,' || @region || ',%')
+      AND (',' || sectors || ',') LIKE ('%,' || @sector || ',%')`),
   quotesForJob: db.prepare(`
     SELECT q.*, u.name AS tradie_name, u.email AS tradie_email, u.phone AS tradie_phone,
       p.business_name, p.licence_no, p.years_trading, p.insurer,
@@ -124,14 +132,10 @@ router.get('/jobs', (req, res) => {
 
 // ---- Post a job ----
 
+// New visitors fill in the job and their details on the same form, and the account is made when they
+// post. Nothing to sign up for before they've said what they need.
 router.get('/jobs/new', (req, res) => {
-  if (!req.user) {
-    // New visitors go through the quick get-started questions first, unless they've already answered them.
-    if (!req.query.trade) return res.redirect('/start?path=need');
-    flash(req, 'info', 'Create a free account first so tradies can send you quotes. It takes 30 seconds.');
-    return res.redirect('/signup?next=' + encodeURIComponent(req.originalUrl));
-  }
-  if (req.user.role === 'tradie') {
+  if (req.user && req.user.role === 'tradie') {
     flash(req, 'info', 'Tradie accounts quote on jobs. Use a separate customer account to post one.');
     return res.redirect('/jobs');
   }
@@ -143,19 +147,29 @@ router.get('/jobs/new', (req, res) => {
       timing: C.oneOf(C.timingName, req.query.timing),
       region: C.oneOf(C.regionName, req.query.region),
     },
+    newUser: req.user ? null : {},
   });
 });
 
+// Someone posting without an account is signing up, so they share the sign-up page's rate limit.
+const signupLimit = limit('signup', 12, 60 * 60 * 1000);
+function mayPost(req, res, next) {
+  if (!req.user) return signupLimit(req, res, next);
+  requireRole('customer', 'admin')(req, res, () => requireCan('post')(req, res, next));
+}
+
 router.post(
   '/jobs',
-  requireRole('customer', 'admin'),
-  requireCan('post'),
+  mayPost,
   uploads.receive('photos', 6),
   verifyCsrf,
   async (req, res, next) => {
     const b = req.body;
+    // Set when a visitor is making their account with this job.
+    const newUser = req.user ? null : accounts.read(b);
+    const password = String(b.password || '');
     const values = {
-      customer_id: req.account.ownerId,
+      customer_id: req.user ? req.account.ownerId : null,
       sector: C.oneOf(C.sectorName, b.sector),
       title: oneLine(b.title, 120),
       trade: C.oneOf(C.tradeName, b.trade),
@@ -182,7 +196,7 @@ router.post(
     else if (config.maxQuoteCents && values.budget === 'over-50k') error = `For now we only take jobs up to ${money(config.maxQuoteCents)}. Bigger building jobs need a registered builder and a written contract.`;
     else if (!C.timingName[values.timing]) error = 'Pick when you need it done.';
     else if (hasContactDetails(values.title, values.description, values.requirements)) error = NO_CONTACTS_CUSTOMER;
-    else if (q.postedToday.get(values.customer_id).n >= JOBS_PER_DAY) error = `You've posted ${JOBS_PER_DAY} jobs today, which is our daily limit. Email ${config.supportEmail} if you need more.`;
+    else if (values.customer_id && q.postedToday.get(values.customer_id).n >= JOBS_PER_DAY) error = `You've posted ${JOBS_PER_DAY} jobs today, which is our daily limit. Email ${config.supportEmail} if you need more.`;
 
     if (!error) {
       const place = locate(values.address);
@@ -190,33 +204,61 @@ router.post(
       else Object.assign(values, { suburb: place.suburb, postcode: place.postcode, region: values.region || place.region });
     }
 
+    if (!error && newUser) error = accounts.problem(newUser, password, 'customer');
     if (!error && req.uploadError) error = req.uploadError;
-    if (error) return res.status(400).render('pages/job-new', { title: 'Post a job', values, error });
+    const fail = (message) => res.status(400).render('pages/job-new', { title: 'Post a job', values, newUser, error: message });
+    if (error) return fail(error);
 
     let photos;
+    let passwordHash;
     try {
+      if (newUser) passwordHash = await accounts.hash(password);
       photos = await uploads.saveAll(req.files);
     } catch (err) {
       return next(err);
     }
-    const id = db.transaction(() => {
-      const jobId = Number(q.insertJob.run(values).lastInsertRowid);
-      for (const f of photos.saved) q.insertPhoto.run(jobId, f);
-      return jobId;
-    })();
+    let id;
+    try {
+      id = db.transaction(() => {
+        if (newUser) values.customer_id = accounts.insert(newUser, passwordHash, 'customer');
+        const jobId = Number(q.insertJob.run(values).lastInsertRowid);
+        for (const f of photos.saved) q.insertPhoto.run(jobId, f);
+        return jobId;
+      })();
+    } catch (err) {
+      for (const f of photos.saved) uploads.remove(f);
+      if (accounts.isTaken(err)) return fail(accounts.TAKEN);
+      return next(err);
+    }
+    if (newUser) logIn(req, values.customer_id);
     if (photos.skipped) flash(req, 'info', uploads.UNREADABLE);
 
     notify.jobPosted(id);
-    if (!photos.skipped) flash(req, 'success', "Your job is live. We'll email you as quotes come in.");
+    if (!photos.skipped) {
+      flash(req, 'success', newUser
+        ? `Your job is live and your account is set up. We'll email you at ${newUser.email} as quotes come in.`
+        : "Your job is live. We'll email you as quotes come in.");
+    }
     res.redirect(`/jobs/${id}`);
   },
 );
 
-// Live preview on the job form: shows what will be public before the job is posted.
+// Live preview on the job form: shows what will be public before the job is posted, and how many
+// checked tradies will hear about it.
 router.get('/api/locate', (req, res) => {
   const place = locate(String(req.query.address || '').slice(0, 200));
   if (place.error) return res.json({ ok: false, message: place.error === 'empty' ? '' : errorMessage(place) });
-  res.json({ ok: true, suburb: place.suburb, region: place.region, regionName: C.regionName[place.region] });
+  const trade = C.oneOf(C.tradeName, req.query.trade);
+  const sector = C.oneOf(C.sectorName, req.query.sector);
+  const region = C.oneOf(C.regionName, req.query.region) || place.region;
+  let match = null;
+  if (trade && sector) {
+    const n = q.tradiesFor.get({ trade: trade === 'other' ? 'handyman' : trade, region, sector }).n;
+    match = n
+      ? `${n} checked tradie${n === 1 ? '' : 's'} cover${n === 1 ? 's' : ''} this kind of job here.`
+      : "We're still signing up tradies for this kind of job here. Post anyway and we'll find someone.";
+  }
+  res.json({ ok: true, suburb: place.suburb, region: place.region, regionName: C.regionName[place.region], match });
 });
 
 // ---- Job page ----

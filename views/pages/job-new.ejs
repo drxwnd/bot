@@ -3,6 +3,7 @@
   <div class="page-head">
     <h1>Post a job</h1>
     <p>The more detail you give, the more accurate the quotes. It's free, and you don't have to accept any of them.</p>
+    <% if (newUser) { %><p class="small muted">Already have an account? <a href="/login?next=<%= encodeURIComponent('/jobs/new') %>">Log in</a> first.</p><% } %>
   </div>
 
   <div class="with-side page" style="padding-top:0">
@@ -97,7 +98,47 @@
         </div>
       </div>
 
-      <button class="btn accent big">Post job</button>
+      <% if (newUser) { %>
+        <hr>
+        <div class="field-intro">
+          <h2>Your details</h2>
+          <p class="hint">This sets up your free account so you can see quotes, pick one and pay. Only the tradie you pay gets your phone and email.</p>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="name">Your name</label>
+            <input id="name" name="name" type="text" autocomplete="name" maxlength="80" required value="<%= newUser.name || '' %>">
+          </div>
+          <div class="field">
+            <label for="phone">Mobile <span class="hint" style="display:inline">(optional)</span></label>
+            <input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="30" placeholder="04xx xxx xxx" value="<%= newUser.phone || '' %>">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="email">Email
+              <span class="hint">Quotes are emailed here.</span>
+            </label>
+            <input id="email" name="email" type="email" autocomplete="email" maxlength="200" required value="<%= newUser.email || '' %>">
+          </div>
+          <div class="field">
+            <label for="password">Choose a password
+              <span class="hint">At least 8 characters.</span>
+            </label>
+            <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="200" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="company">Business or organisation <span class="hint" style="display:inline">(optional)</span>
+            <span class="hint">For a hotel, agency or mining company.</span>
+          </label>
+          <input id="company" name="company" type="text" autocomplete="organization" maxlength="100" value="<%= newUser.company || '' %>">
+        </div>
+        <p class="small muted">By posting, you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
+        <button class="btn accent big">Post job and create account</button>
+      <% } else { %>
+        <button class="btn accent big">Post job</button>
+      <% } %>
     </form>
 
     <aside>

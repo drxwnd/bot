@@ -132,7 +132,12 @@
                   Insured<% if (qt.licence_no) { %> &middot; Licensed<% } %>
                 </div>
               </div>
-              <div class="quote-amt"><%= money(qt.amount_cents) %></div>
+              <%# With the payment fee on, the first price the customer sees is the one they'd pay. %>
+              <% const qtFee = customerFeeFor(qt.amount_cents); %>
+              <div class="quote-amt">
+                <%= money(qt.amount_cents + qtFee) %><% if (qtFee) { %><small>total</small>
+                  <span class="quote-split"><span><%= money(qt.amount_cents) %> quote</span> <span>+ <%= money(qtFee) %> payment fee</span></span><% } %>
+              </div>
             </div>
             <div class="quote-body prose"><%= qt.message %></div>
             <div class="quote-foot">
@@ -143,7 +148,7 @@
               <% if (job.status === 'open' && qt.status === 'pending' && !canAccept) { %>
                 <span class="small">A manager accepts quotes</span>
               <% } else if (job.status === 'open' && qt.status === 'pending') { %>
-                <form method="post" action="/quotes/<%= qt.id %>/accept" data-confirm="Accept this quote for <%= money(qt.amount_cents) %>? Other quotes will be declined.">
+                <form method="post" action="/quotes/<%= qt.id %>/accept" data-confirm="Accept this quote for <%= money(qt.amount_cents + qtFee) %><%= qtFee ? ` (${money(qt.amount_cents)} quote + ${money(qtFee)} payment fee)` : '' %>? Other quotes will be declined.">
                   <input type="hidden" name="_csrf" value="<%= csrf %>">
                   <input type="hidden" name="amount_cents" value="<%= qt.amount_cents %>">
                   <button class="btn small">Accept quote</button>

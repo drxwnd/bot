@@ -4,17 +4,25 @@ document.addEventListener('submit', function (e) {
   if (msg && !window.confirm(msg)) e.preventDefault();
 });
 
-// Job form: show which suburb will be public as the address is typed, and fill in the area tag.
+// Job form: show which suburb will be public as the address is typed, fill in the area tag, and say
+// how many checked tradies cover that kind of job there.
 (function () {
   var input = document.querySelector('[data-locate]');
   if (!input) return;
+  var form = input.form;
   var preview = document.getElementById('locate-preview');
   var region = document.getElementById('region');
+  var trade = document.getElementById('trade');
   var autoFilled = !region.value;
   var timer;
 
   region.addEventListener('change', function () {
     autoFilled = false;
+    check();
+  });
+  trade.addEventListener('change', check);
+  form.querySelectorAll('input[name=sector]').forEach(function (r) {
+    r.addEventListener('change', check);
   });
 
   function check() {
@@ -23,7 +31,10 @@ document.addEventListener('submit', function (e) {
       preview.textContent = '';
       return;
     }
-    fetch('/api/locate?address=' + encodeURIComponent(value))
+    var sector = form.querySelector('input[name=sector]:checked');
+    var params = new URLSearchParams({ address: value, trade: trade.value, sector: sector ? sector.value : '' });
+    if (!autoFilled && region.value) params.set('region', region.value);
+    fetch('/api/locate?' + params.toString())
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (input.value.trim() !== value) return;
@@ -37,6 +48,12 @@ document.addEventListener('submit', function (e) {
         strong.textContent = data.suburb;
         preview.appendChild(strong);
         preview.appendChild(document.createTextNode(' · Area: ' + data.regionName));
+        if (data.match) {
+          var match = document.createElement('span');
+          match.className = 'locate-match';
+          match.textContent = data.match;
+          preview.appendChild(match);
+        }
         if (autoFilled) region.value = data.region;
       })
       .catch(function () {});

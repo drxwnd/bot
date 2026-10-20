@@ -4,7 +4,7 @@
 const crypto = require('crypto');
 const config = require('./config');
 const C = require('./constants');
-const { money, formatAbn } = require('./helpers');
+const { money, formatAbn, customerFeeFor } = require('./helpers');
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -86,17 +86,22 @@ const T = {
       unsubscribe: tradie.id,
     }),
 
-  quoteReceived: (customer, job, quote, business, count) =>
-    layout({
-      subject: `New quote for your job: ${money(quote.amount_cents)} from ${business}`,
-      heading: `${business} quoted ${money(quote.amount_cents)}`,
+  quoteReceived: (customer, job, quote, business, count) => {
+    // The price shown is what the customer would pay, payment fee included.
+    const fee = customerFeeFor(quote.amount_cents);
+    const total = money(quote.amount_cents + fee);
+    return layout({
+      subject: `New quote for your job: ${total} from ${business}`,
+      heading: `${business} quoted ${total}`,
       lines: [
+        ...(fee ? [`That's ${money(quote.amount_cents)} for the job plus a ${money(fee)} secure payment fee.`] : []),
         `For your job "${job.title}" in ${job.suburb}. ${count > 1 ? `You now have ${count} quotes to compare.` : "It's your first quote. More usually follow within a day or two."}`,
         quote.message.length > 300 ? quote.message.slice(0, 300) + '…' : quote.message,
         "You don't have to accept any quote. When you do, you pay and we hold the money until the job's done.",
       ],
       button: { label: 'Compare quotes', href: url(`/jobs/${job.id}`) },
-    }),
+    });
+  },
 
   quoteAccepted: (tradie, job, quote) =>
     layout({

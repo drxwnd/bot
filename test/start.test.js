@@ -1,4 +1,4 @@
-// The get-started quiz: both paths, saved answers, and pre-filled forms afterwards.
+// Getting started: customers go straight to the job form; tradies answer a few questions first.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -33,7 +33,8 @@ function browser() {
   async function req(method, url, body) {
     const headers = { cookie: Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ') };
     let payload;
-    if (body) {
+    if (body instanceof FormData) payload = body;
+    else if (body) {
       headers['content-type'] = 'application/x-www-form-urlencoded';
       payload = new URLSearchParams({ _csrf: csrf, ...body }).toString();
     }
@@ -48,39 +49,71 @@ function browser() {
     if (m) csrf = m[1];
     return { status: res.status, location: res.headers.get('location'), text };
   }
-  return { get: (u) => req('GET', u), post: (u, b) => req('POST', u, b) };
+  return {
+    get: (u) => req('GET', u),
+    post: (u, b) => req('POST', u, b),
+    form: (u, fields) => {
+      const fd = new FormData();
+      fd.set('_csrf', csrf);
+      for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+      return req('POST', u, fd);
+    },
+  };
 }
 
-const decode = (s) => s.replace(/&amp;/g, '&');
-
-test('customer path ends with a filled-in job form', async () => {
+test('people who need work done go straight to the job form, and sign up as they post', async () => {
   const b = browser();
   let res = await b.get('/start');
   assert.match(res.text, /What brings you here/);
-  res = await b.get('/start?path=need');
-  assert.match(res.text, /Who's the work for/);
-  res = await b.get('/start?path=need&who=hotel');
-  assert.match(res.text, /What needs doing/);
-  // Hotels see air con first.
-  assert.ok(res.text.indexOf('Air con') < res.text.indexOf('Concreting'));
-  res = await b.get('/start?path=need&who=hotel&trade=aircon&timing=urgent');
-  assert.match(res.text, /Where's the job/);
-  res = await b.get('/start?path=need&who=hotel&trade=aircon&timing=urgent&region=kimberley');
-  assert.match(res.text, /You're all set/);
-  assert.match(res.text, /access and timing/);
-  assert.match(res.text, /still signing up/);
+  assert.match(res.text, /href="\/jobs\/new"/);
 
-  // Sign up from the result page, then the job form is pre-filled.
-  const signupHref = decode(res.text.match(/href="(\/signup\?next=[^"]+)"/)[1]);
-  await b.get(signupHref);
-  res = await b.post('/signup', { as: 'customer', name: 'Mia', email: 'mia@test.local', password: 'longpassword', next: decodeURIComponent(signupHref.split('next=')[1]) });
-  assert.match(res.location, /^\/jobs\/new\?sector=hotels&trade=aircon&timing=urgent&region=kimberley/);
-  assert.strictEqual(db.prepare("SELECT customer_type FROM users WHERE email = 'mia@test.local'").get().customer_type, 'hotel');
+  // Old links to the customer questions land on the form with their answers filled in.
+  res = await b.get('/start?path=need&who=hotel&trade=aircon&timing=urgent&region=kimberley');
+  assert.strictEqual(res.location, '/jobs/new?sector=hotels&trade=aircon&timing=urgent&region=kimberley');
   res = await b.get(res.location);
+  assert.strictEqual(res.status, 200);
   assert.match(res.text, /value="hotels" checked/);
   assert.match(res.text, /value="aircon" selected/);
   assert.match(res.text, /value="urgent" selected/);
   assert.match(res.text, /value="kimberley" selected/);
+  assert.match(res.text, /Your details/);
+  assert.match(res.text, /Post job and create account/);
+
+  const job = {
+    sector: 'hotels', title: 'Service four split systems', trade: 'aircon', address: '1 Test St, Bayswater WA 6053',
+    description: 'Four wall-mounted split systems in guest rooms need a clean and service before summer.', budget: '500-2k', timing: 'urgent',
+  };
+
+  // An email that already has an account: nothing is created, and what they typed comes back.
+  db.prepare("INSERT INTO users (email, password_hash, name, role) VALUES ('taken@test.local', '!', 'Taken', 'customer')").run();
+  res = await b.form('/jobs', { ...job, name: 'Mia', email: 'taken@test.local', password: 'longpassword' });
+  assert.strictEqual(res.status, 400);
+  assert.match(res.text, /already an account with that email/);
+  assert.match(res.text, /Service four split systems/);
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM jobs').get().n, 0);
+
+  // A short password is refused the same way.
+  res = await b.form('/jobs', { ...job, name: 'Mia', email: 'mia@test.local', password: 'short' });
+  assert.strictEqual(res.status, 400);
+  assert.match(res.text, /at least 8 characters/);
+
+  res = await b.form('/jobs', { ...job, name: 'Mia', email: 'Mia@Test.local', phone: '0400 111 222', company: 'Coastal Stays', password: 'longpassword' });
+  assert.strictEqual(res.status, 302);
+  const jobId = Number(res.location.split('/').pop());
+  const mia = db.prepare("SELECT * FROM users WHERE email = 'mia@test.local'").get();
+  assert.ok(mia, 'account made');
+  assert.strictEqual(mia.role, 'customer');
+  assert.strictEqual(mia.company, 'Coastal Stays');
+  assert.strictEqual(db.prepare('SELECT customer_id FROM jobs WHERE id = ?').get(jobId).customer_id, mia.id);
+
+  // They're logged in, and the job page is theirs.
+  res = await b.get(`/jobs/${jobId}`);
+  assert.match(res.text, /your account is set up/);
+  assert.strictEqual((await b.get('/dashboard')).status, 200);
+
+  // The job form says how many checked tradies would see it.
+  const api = await (await fetch(`${base}/api/locate?address=${encodeURIComponent('1 Test St, Bayswater WA 6053')}&trade=aircon&sector=hotels`)).json();
+  assert.match(api.match, /still signing up/);
 });
 
 test('tradie path shows matching jobs and pre-fills business details', async () => {
@@ -103,9 +136,15 @@ test('tradie path shows matching jobs and pre-fills business details', async () 
   assert.doesNotMatch(res.text, /value="painting" checked/);
 });
 
-test('logged-out visitors heading to post a job start with the quiz', async () => {
-  const res = await browser().get('/jobs/new');
-  assert.strictEqual(res.location, '/start?path=need');
+test('logged-out visitors can open the job form, and a multipart post still needs the form token', async () => {
+  const b = browser();
+  const res = await b.get('/jobs/new');
+  assert.strictEqual(res.status, 200);
+  assert.match(res.text, /Your details/);
+  const fd = new FormData();
+  fd.set('title', 'No token on this one');
+  const post = await fetch(`${base}/jobs`, { method: 'POST', body: fd, redirect: 'manual' });
+  assert.strictEqual(post.status, 403);
   const look = await browser().get('/start?path=look');
   assert.strictEqual(look.location, '/how-it-works');
 });
