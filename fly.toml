@@ -1,6 +1,6 @@
 # Fly.io config. Change `app` to the name you pick with `fly launch` (it must be unique on Fly).
 # Sydney is the closest region to Perth.
-app = "tradebench"
+app = "trade-bench"
 primary_region = "syd"
 
 [build]

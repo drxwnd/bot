@@ -29,11 +29,11 @@ const config = {
 
   // Email. Set one of these to send for real. Without one, emails are logged (and kept in the
   // emails table) instead of sent.
-  emailFrom: process.env.EMAIL_FROM || `${process.env.SITE_NAME || 'Tradebench'} <hello@tradebench.au>`,
+  emailFrom: process.env.EMAIL_FROM || `${process.env.SITE_NAME || 'Tradebench'} <hello@trade-bench.com>`,
   resendApiKey: process.env.RESEND_API_KEY || '',
   postmarkToken: process.env.POSTMARK_TOKEN || '',
 
-  // Optional Plausible analytics: the domain as set up in Plausible, e.g. tradebench.au.
+  // Optional Plausible analytics: the domain as set up in Plausible, e.g. trade-bench.com.
   plausibleDomain: process.env.PLAUSIBLE_DOMAIN || '',
 
   // Your ABN and the legal name it's registered to (for a sole trader, your own name). Shown in the
@@ -42,7 +42,7 @@ const config = {
   legalName: process.env.LEGAL_NAME || '',
 
   adminEmail: (process.env.ADMIN_EMAIL || '').toLowerCase(),
-  supportEmail: process.env.SUPPORT_EMAIL || 'hello@tradebench.au',
+  supportEmail: process.env.SUPPORT_EMAIL || 'hello@trade-bench.com',
 
   dataDir: process.env.DATA_DIR || path.join(root, 'data'),
   uploadDir: process.env.UPLOAD_DIR || path.join(root, 'uploads'),
@@ -72,8 +72,9 @@ if (config.isProd) {
   if (!config.stripeSecretKey) problems.push('STRIPE_SECRET_KEY must be set, or customers cannot pay');
   if (config.stripeSecretKey && !config.stripeWebhookSecret) problems.push('STRIPE_WEBHOOK_SECRET must be set');
   if (!config.adminEmail) problems.push('ADMIN_EMAIL must be set so someone can approve tradies');
+  // Without email nobody can reset a forgotten password, and no job alerts or payment notices go out.
+  if (!config.emailEnabled) problems.push('RESEND_API_KEY or POSTMARK_TOKEN must be set, or no emails (password resets, job alerts) go out');
   if (problems.length) throw new Error('Not ready for production:\n  - ' + problems.join('\n  - '));
-  if (!config.emailEnabled) console.warn('Warning: no email provider set (RESEND_API_KEY or POSTMARK_TOKEN). Emails will only be logged.');
   if (!config.businessAbn) console.warn('Warning: BUSINESS_ABN is not set. Add it once your ABN comes through.');
   if (config.stripeSecretKey.startsWith('sk_test_')) console.warn('Warning: Stripe is in test mode. No real money will move.');
 }

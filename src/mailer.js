@@ -19,6 +19,13 @@ const pending = new Set();
 // and local testing. Never in production, where links are only ever in the email itself.
 const outbox = [];
 
+// Too many requests (429) and provider outages (5xx) are worth trying again; a bad address isn't.
+async function providerError(name, res) {
+  const err = new Error(`${name} ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  err.retryable = res.status === 429 || res.status >= 500;
+  return err;
+}
+
 async function deliver(message) {
   if (config.resendApiKey) {
     const res = await fetch('https://api.resend.com/emails', {
@@ -33,7 +40,7 @@ async function deliver(message) {
         html: message.html,
       }),
     });
-    if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) throw await providerError('Resend', res);
     return 'sent';
   }
   if (config.postmarkToken) {
@@ -54,7 +61,7 @@ async function deliver(message) {
         MessageStream: 'outbound',
       }),
     });
-    if (!res.ok) throw new Error(`Postmark ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) throw await providerError('Postmark', res);
     return 'sent';
   }
   if (!quiet) console.log(`[email not sent, no provider] to ${message.to}: ${message.subject}`);
@@ -71,11 +78,22 @@ function send(message) {
     outbox.push(message);
     if (outbox.length > 100) outbox.shift();
   }
+  return attempt(message, id, 0);
+}
+
+// Minutes to wait before each retry. Retries are only timers in memory: they don't hold up
+// shutdown, and a restart drops them (the email stays marked failed in the log).
+const RETRY_MINUTES = [1, 10, 60];
+
+function attempt(message, id, tries) {
   const p = deliver(message)
     .then((status) => q.done.run(status, null, id))
     .catch((err) => {
-      console.error(`Email ${id} to ${message.to} failed:`, err.message);
+      // A network error (fetch throws TypeError) is worth retrying too.
+      const retry = (err.retryable ?? err instanceof TypeError) && tries < RETRY_MINUTES.length;
+      console.error(`Email ${id} to ${message.to} failed${retry ? ', will retry' : ''}:`, err.message);
       q.done.run('failed', err.message.slice(0, 500), id);
+      if (retry) setTimeout(() => attempt(message, id, tries + 1), RETRY_MINUTES[tries] * 60 * 1000).unref();
     })
     .finally(() => pending.delete(p));
   pending.add(p);

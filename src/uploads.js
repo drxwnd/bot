@@ -72,8 +72,21 @@ function receive(field, maxFiles) {
   };
 }
 
+// The browser's file type is only a claim, and sharp picks its decoder from the file's own bytes,
+// so an SVG or TIFF renamed .jpg would reach decoders we never meant to expose. Only let through
+// files that start like a JPEG, PNG, WebP or HEIC/AVIF photo.
+const HEIF_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1', 'avif', 'avis']);
+function isPhoto(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) return false;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return true;
+  if (buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return true;
+  return buf.toString('latin1', 4, 8) === 'ftyp' && HEIF_BRANDS.has(buf.toString('latin1', 8, 12));
+}
+
 // Re-encode and save one image. Returns the file name (the thumbnail is name-sm.jpg).
 async function save(file, { isPrivate = false, maxSide = 1800 } = {}) {
+  if (!isPhoto(file.buffer)) throw new Error('Not a photo');
   const dir = isPrivate ? privateDir : config.uploadDir;
   const name = crypto.randomBytes(12).toString('hex');
   const img = sharp(file.buffer, { failOn: 'error', limitInputPixels: MAX_PIXELS }).rotate();
@@ -120,4 +133,4 @@ function privatePath(filename) {
 
 const UNREADABLE = "Some photos couldn't be read. Use JPG or PNG. On an iPhone, set Settings > Camera > Formats to Most Compatible.";
 
-module.exports = { receive, save, saveAll, remove, thumb, privatePath, privateDir, UNREADABLE, MAX_MB };
+module.exports = { receive, save, saveAll, remove, thumb, privatePath, privateDir, isPhoto, UNREADABLE, MAX_MB };

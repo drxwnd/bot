@@ -234,6 +234,9 @@ async function refund(payment) {
 async function doRelease(payment, tradieProfile) {
   if (payment.status !== 'held') throw new Error('Nothing to release');
   if (payment.disputed) throw new Error('This payment is under a card dispute and cannot be released until that is resolved');
+  // Part of it went back to the customer in Stripe. Paying the tradie the full amount on top would
+  // come out of the platform's pocket, so it waits for an admin to sort it out.
+  if (payment.refunded_cents > 0) throw new Error('Part of this payment was refunded in Stripe, so it cannot be released. An admin needs to sort it out with the customer and tradie.');
   const payout = payment.amount_cents - payment.fee_cents;
   let transferId = 'tr_simulated';
 
@@ -262,9 +265,11 @@ async function doRelease(payment, tradieProfile) {
 async function doRefund(payment) {
   if (payment.status !== 'held') throw new Error('Only held payments can be refunded');
   const amount = payment.amount_cents;
-  if (stripe) {
+  // After a part refund in Stripe, only the rest of the quote amount is still to go back.
+  const remaining = amount - (payment.refunded_cents || 0);
+  if (stripe && remaining > 0) {
     await stripe.refunds.create(
-      { payment_intent: payment.stripe_payment_intent, amount },
+      { payment_intent: payment.stripe_payment_intent, amount: remaining },
       { idempotencyKey: `refund-${payment.id}` },
     );
   }
@@ -310,7 +315,8 @@ function refundedInStripe(charge) {
       notify.refunded(payment.job_id);
     }
   } else if (back > 0) {
-    notify.adminAlert(`${back} cents of payment ${payment.id} (job ${payment.job_id}) was refunded in Stripe, but not the whole quote. It's still held here, so check it before anyone releases it.`);
+    db.prepare("UPDATE payments SET refunded_cents = ? WHERE id = ? AND status = 'held'").run(back, payment.id);
+    notify.adminAlert(`${back} cents of payment ${payment.id} (job ${payment.job_id}) was refunded in Stripe, but not the whole quote. It's blocked from release until you sort it out: refund the rest from /admin, or settle it with the customer and tradie in Stripe.`);
   }
 }
 

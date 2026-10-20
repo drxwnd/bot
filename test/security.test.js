@@ -331,6 +331,18 @@ test('an image claiming to be enormous is refused before it is decoded', async (
   await assert.rejects(uploads.save({ buffer: png }), /pixel limit/);
 });
 
+test('only real photo formats reach the image decoders, whatever the file says it is', async () => {
+  const uploads = require('../src/uploads');
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>');
+  const tiff = await sharp({ create: { width: 10, height: 10, channels: 3, background: '#ffffff' } }).tiff().toBuffer();
+  await assert.rejects(uploads.save({ buffer: svg, mimetype: 'image/jpeg' }), /Not a photo/);
+  await assert.rejects(uploads.save({ buffer: tiff, mimetype: 'image/jpeg' }), /Not a photo/);
+  for (const make of [(s) => s.jpeg(), (s) => s.png(), (s) => s.webp()]) {
+    const buf = await make(sharp({ create: { width: 10, height: 10, channels: 3, background: '#ffffff' } })).toBuffer();
+    assert.ok(uploads.isPhoto(buf));
+  }
+});
+
 test('password guessing on one account is slowed down across many addresses', async () => {
   let res;
   for (let i = 0; i < 31; i++) {

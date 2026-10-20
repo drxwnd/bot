@@ -35,17 +35,19 @@ When you approve tradies, check their licence on the right register. Their job a
 1. Finish activating your Stripe account (business details, bank account, ID).
 2. Go to **Connect** and get started. Choose **Platform or marketplace**, **Express** accounts, platform country **Australia**. Fill in the platform profile: you collect payments from customers and pay out service providers.
 3. **Developers > API keys**: copy the secret key. Start with the `sk_test_` one.
-4. **Developers > Webhooks > Add endpoint**: `https://tradebench.au/stripe/webhook`, with these events:
+4. **Developers > Webhooks > Add endpoint**: `https://trade-bench.com/stripe/webhook`, with these events:
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `account.updated`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`.
    Copy the signing secret (`whsec_...`).
 
 ### Email (Resend)
 
-1. Sign up and add your domain (`tradebench.au`).
+1. Sign up and add your domain (`trade-bench.com`).
 2. Resend shows you a few DNS records. Add them where your domain is (GoDaddy > DNS). They let your emails land in inboxes instead of junk.
 3. Create an API key.
 
-Without email the site still works, but nobody gets job alerts, quote alerts or password resets, and that's most of what brings people back.
+The live site won't start without an email key: without email nobody gets job alerts, quote alerts or password resets, and that's most of what brings people back.
+
+Resend's free plan stops at 100 emails a day, and every new job emails each matching tradie. Once you have more than about 20 tradies, move to the paid plan (about US$20 a month for 50,000) before you hit the limit. If Resend is busy or down, the site tries each email again after 1, 10 and 60 minutes.
 
 ## 3. Put it online (Fly.io)
 
@@ -58,19 +60,19 @@ fly volumes create tradebench_data --region syd --size 3
 
 # settings (use your real values)
 fly secrets set \
-  SITE_URL=https://tradebench.au \
+  SITE_URL=https://trade-bench.com \
   SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
   ADMIN_EMAIL=you@yourmail.com \
   STRIPE_SECRET_KEY=sk_test_... \
   STRIPE_WEBHOOK_SECRET=whsec_... \
   RESEND_API_KEY=re_... \
-  EMAIL_FROM="Tradebench <hello@tradebench.au>" \
-  SUPPORT_EMAIL=hello@tradebench.au \
-  REDIRECT_HOSTS=www.tradebench.au
+  EMAIL_FROM="Tradebench <hello@trade-bench.com>" \
+  SUPPORT_EMAIL=hello@trade-bench.com \
+  REDIRECT_HOSTS=www.trade-bench.com
 
 fly deploy
-fly certs add tradebench.au
-fly certs add www.tradebench.au
+fly certs add trade-bench.com
+fly certs add www.trade-bench.com
 ```
 
 `fly certs add` tells you which DNS records to add at GoDaddy. Once they're in, the site is live on your domain with HTTPS.
@@ -158,7 +160,7 @@ A marketplace makes money when a job gets three good quotes fast. Everything bel
 - Keep that promise by hand. When `/admin` emails you about a job with no quotes, ring a tradie.
 
 **All along:**
-- **Google:** set up a Google Business Profile, and submit `https://tradebench.au/sitemap.xml` in Search Console. The trade and area pages are built to rank for searches like "tiler Bayswater" over the following months.
+- **Google:** set up a Google Business Profile, and submit `https://trade-bench.com/sitemap.xml` in Search Console. The trade and area pages are built to rank for searches like "tiler Bayswater" over the following months.
 - **Reviews:** ask every happy customer for a review. The site emails them a link after they release payment.
 - **Scripts and flyers:** `docs/OUTREACH.md` has phone and email scripts. Print flyers from `/admin/flyer/tradies` and `/admin/flyer/customers`.
 - **Groups:** post in local Facebook community groups when you can honestly say "we've got tilers and plumbers free this week in [suburb]".

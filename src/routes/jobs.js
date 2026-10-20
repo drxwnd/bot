@@ -420,6 +420,11 @@ router.post('/jobs/:id/release', requireLogin, loadJob, ownsJob, requireJobActio
     return res.redirect(`/jobs/${job.id}`);
   }
 
+  if (payment.refunded_cents > 0) {
+    flash(req, 'error', `Part of this payment has been refunded, so it can't be released here. Email ${config.supportEmail} and we'll sort it out.`);
+    return res.redirect(`/jobs/${job.id}`);
+  }
+
   const quote = q.quote.get(job.accepted_quote_id);
   const profile = q.profile.get(quote.tradie_id);
   if (!profile.stripe_account_id || !profile.payouts_enabled) {

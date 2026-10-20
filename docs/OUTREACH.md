@@ -10,7 +10,7 @@ Use these as a starting point and say them in your own words. Print flyers from 
 
 **Text to follow up**
 
-> "Hi [name], [your name] from Tradebench. Here's the link to sign up: tradebench.au/for-tradies. Free to join, customer pays before you start, 4% only when you're paid. Ring me if you've got questions."
+> "Hi [name], [your name] from Tradebench. Here's the link to sign up: trade-bench.com/for-tradies. Free to join, customer pays before you start, 4% only when you're paid. Ring me if you've got questions."
 
 **If they say...**
 - **"I've got enough work."** "No worries. It's handy for the quiet weeks, and jobs only come to you if they match your trade and area. There's nothing to pay unless you win one."
@@ -29,7 +29,7 @@ Ring agencies near where your tradies are. Ask for whoever handles maintenance.
 >
 > Hi [name],
 >
-> Thanks for the chat. Here's the link to post your next job: tradebench.au/start
+> Thanks for the chat. Here's the link to post your next job: trade-bench.com/start
 >
 > - Free to post. Quotes from local tradies whose ABN, licence and insurance we've checked.
 > - Your payment is held until you sign the job off.
@@ -58,7 +58,7 @@ Ring site services or camp maintenance coordinators, not the head office.
 
 Only post where the group allows business posts, and keep it plain.
 
-> "Hi all. We've just started Tradebench, a Perth site for getting quotes from checked local tradies (ABN, licence and insurance checked). It's free to post a job, and you pay through the site, but the tradie only gets the money once you're happy it's done. We've got tilers, plumbers and sparkies covering [suburbs]. tradebench.au"
+> "Hi all. We've just started Tradebench, a Perth site for getting quotes from checked local tradies (ABN, licence and insurance checked). It's free to post a job, and you pay through the site, but the tradie only gets the money once you're happy it's done. We've got tilers, plumbers and sparkies covering [suburbs]. trade-bench.com"
 
 ## What to track each week
 

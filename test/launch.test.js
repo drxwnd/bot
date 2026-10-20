@@ -261,6 +261,17 @@ test('a refund gives back the quote but keeps the secure payment fee', async () 
   assert.strictEqual(one('SELECT status FROM payments WHERE id = ?', third).status, 'held');
   await mailer.flush();
   assert.ok(emailsTo('boss@test.local', 'admin_alert').some((e) => /5000 cents of payment/.test(e.body_text)));
+  // ...and it can't be released on top of the money that already went back.
+  await assert.rejects(
+    payments.release(one('SELECT * FROM payments WHERE id = ?', third), { stripe_account_id: 'acct_x' }),
+    /refunded in Stripe/,
+  );
+  assert.strictEqual(one('SELECT status FROM payments WHERE id = ?', third).status, 'held');
+  // Refunding the rest from the admin page finishes it off.
+  await payments.refund(one('SELECT * FROM payments WHERE id = ?', third));
+  p = one('SELECT * FROM payments WHERE id = ?', third);
+  assert.strictEqual(p.status, 'refunded');
+  assert.strictEqual(p.refunded_cents, 20000);
 });
 
 test('password reset and unsubscribe links', async () => {
@@ -319,4 +330,16 @@ test('printable flyers are admin only and carry a QR code', async () => {
   assert.match(res.text, /Scan to post your first job/);
   res = await browser().get('/admin/flyer/tradies');
   assert.notStrictEqual(res.status, 200);
+});
+
+test('backups: one file per day, however often the site restarts', async () => {
+  const backup = require('../src/backup');
+  const dir = path.join(tmp, 'backups');
+  const first = await backup.backup();
+  assert.ok(first && fs.existsSync(first));
+  // A restart later the same day doesn't make another one.
+  assert.strictEqual(await backup.backup(), null);
+  // `npm run backup` refreshes today's file instead of adding a second.
+  assert.strictEqual(await backup.backup({ force: true }), first);
+  assert.deepStrictEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.db')), [path.basename(first)]);
 });
