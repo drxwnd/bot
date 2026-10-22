@@ -160,7 +160,9 @@ A marketplace makes money when a job gets three good quotes fast. Everything bel
 - Keep that promise by hand. When `/admin` emails you about a job with no quotes, ring a tradie.
 
 **All along:**
-- **Google:** set up a Google Business Profile, and submit `https://trade-bench.com/sitemap.xml` in Search Console. The trade and area pages are built to rank for searches like "tiler Bayswater" over the following months.
+- **Google:** set up a Google Business Profile, and submit `https://trade-bench.com/sitemap.xml` in Search Console. The trade and area pages are built to rank for searches like "tilers in Perth's north-east" over the following months.
+- **Bing:** add the site in [Bing Webmaster Tools](https://www.bing.com/webmasters) (it can import from Search Console), put its code in `BING_SITE_VERIFICATION`, and set `INDEXNOW_KEY` to any random string. New jobs are then sent to Bing as they're posted, and filled ones as they close. Bing also feeds DuckDuckGo and ChatGPT search.
+- **Prices:** once a trade has 5 paid jobs in the last year, its page shows the real price range ("Most paid jobs were $600 to $1,400"). That's the answer to "how much does a tiler cost in Perth", from your own data, so it gets better the more jobs go through.
 - **Reviews:** ask every happy customer for a review. The site emails them a link after they release payment.
 - **Scripts and flyers:** `docs/OUTREACH.md` has phone and email scripts. Print flyers from `/admin/flyer/tradies` and `/admin/flyer/customers`.
 - **Groups:** post in local Facebook community groups when you can honestly say "we've got tilers and plumbers free this week in [suburb]".

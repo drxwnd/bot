@@ -56,8 +56,8 @@
       <div class="box">
         <dl class="kv">
           <dt>Works in</dt><dd><%= tradie.sectors.split(',').map(s => sectorName[s]).join(', ') %></dd>
-          <dt>Trades</dt><dd><%= tradie.trades.split(',').map(s => tradeName[s]).join(', ') %></dd>
-          <dt>Areas</dt><dd><%= tradie.regions.split(',').map(s => regionName[s]).join(', ') %></dd>
+          <dt>Trades</dt><dd><% tradie.trades.split(',').filter(s => tradeName[s]).forEach((s, i) => { %><%= i ? ', ' : '' %><% if (TRADE_INFO[s]) { %><a href="/trades/<%= s %>"><%= tradeName[s] %></a><% } else { %><%= tradeName[s] %><% } %><% }) %></dd>
+          <dt>Areas</dt><dd><% tradie.regions.split(',').filter(s => regionName[s]).forEach((s, i) => { %><%= i ? ', ' : '' %><a href="/areas/<%= s %>"><%= regionName[s] %></a><% }) %></dd>
           <% if (tradie.years_trading) { %><dt>Experience</dt><dd><%= tradie.years_trading %> years</dd><% } %>
           <dt>ABN</dt><dd>Checked</dd>
           <dt>Insurance</dt><dd>Checked</dd>

@@ -263,14 +263,17 @@
         <dl class="kv">
           <dt>Job</dt><dd class="mono">#<%= jobNo %></dd>
           <dt>Type</dt><dd><%= sectorName[job.sector] %></dd>
-          <dt>Trade</dt><dd><%= tradeName[job.trade] %></dd>
+          <dt>Trade</dt><dd><% if (TRADE_INFO[job.trade]) { %><a href="/trades/<%= job.trade %>"><%= tradeName[job.trade] %></a><% } else { %><%= tradeName[job.trade] %><% } %></dd>
           <dt>Location</dt><dd><%= job.suburb %></dd>
           <% if (isOwner && job.address) { %><dt>Address</dt><dd><%= job.address %><br><span class="small muted">Only you and the tradie you accept see this</span></dd><% } %>
-          <dt>Area</dt><dd><%= regionName[job.region] %></dd>
+          <dt>Area</dt><dd><a href="/areas/<%= job.region %>"><%= regionName[job.region] %></a></dd>
           <dt>Budget</dt><dd><%= budgetName[job.budget] %></dd>
           <dt>Timing</dt><dd><%= timingName[job.timing] %></dd>
           <dt>Posted</dt><dd><%= shortDate(job.created_at) %></dd>
         </dl>
+        <% if (TRADE_INFO[job.trade]) { %>
+          <p class="small" style="margin:12px 0 0"><a href="/trades/<%= job.trade %>/<%= job.region %>"><%= TRADE_INFO[job.trade].plural %> in <%= REGION_INFO[job.region].name %></a></p>
+        <% } %>
       </div>
 
       <% if (!user) { %>

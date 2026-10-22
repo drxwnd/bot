@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const payments = require('../payments');
 const notify = require('../notify');
+const indexnow = require('../indexnow');
 const { flash, requireRole } = require('../middleware');
 const { can } = require('../permissions');
 const config = require('../config');
@@ -155,7 +156,11 @@ router.post('/tradies/:id/:action', (req, res, next) => {
   if (!['approve', 'reject'].includes(req.params.action)) return next();
   const status = req.params.action === 'approve' ? 'approved' : 'rejected';
   const id = Number(req.params.id);
-  if (q.setStatus.run(status, status, id).changes) notify.tradieReviewed(id, status);
+  if (q.setStatus.run(status, status, id).changes) {
+    notify.tradieReviewed(id, status);
+    // Their public profile appears (approved) or goes away (rejected).
+    indexnow.submit(`/tradies/${id}`);
+  }
   flash(req, 'success', `Tradie ${status}. We've emailed them.`);
   res.redirect('/admin#tradies');
 });

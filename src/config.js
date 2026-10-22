@@ -33,6 +33,12 @@ const config = {
   resendApiKey: process.env.RESEND_API_KEY || '',
   postmarkToken: process.env.POSTMARK_TOKEN || '',
 
+  // Bing Webmaster Tools verification code (the content="..." value from its meta tag option).
+  bingVerification: process.env.BING_SITE_VERIFICATION || '',
+  // IndexNow key: lets Bing (and others that use IndexNow) hear about new and closed jobs straight away
+  // instead of waiting for a crawl. Any 8 to 128 letters, numbers or dashes you make up.
+  indexNowKey: process.env.INDEXNOW_KEY || '',
+
   // Optional Plausible analytics: the domain as set up in Plausible, e.g. trade-bench.com.
   plausibleDomain: process.env.PLAUSIBLE_DOMAIN || '',
 
@@ -58,6 +64,10 @@ for (const [name, value, max] of [
   if (!Number.isFinite(value) || value < 0 || value > max) {
     throw new Error(`${name} must be a number between 0 and ${max} (it's set to "${value}")`);
   }
+}
+
+if (config.indexNowKey && !/^[A-Za-z0-9-]{8,128}$/.test(config.indexNowKey)) {
+  throw new Error('INDEXNOW_KEY must be 8 to 128 letters, numbers or dashes');
 }
 
 config.paymentsEnabled = Boolean(config.stripeSecretKey);

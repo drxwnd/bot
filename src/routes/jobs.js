@@ -9,6 +9,7 @@ const notify = require('../notify');
 const { parseDollars, money, hasContactDetails, oneLine } = require('../helpers');
 const { limit } = require('../ratelimit');
 const accounts = require('../accounts');
+const indexnow = require('../indexnow');
 const seo = require('../seo');
 const { locate, errorMessage } = require('../locality');
 const { flash, verifyCsrf, logIn, requireLogin, requireRole, requireCan, requireApprovedTradie } = require('../middleware');
@@ -46,6 +47,13 @@ const q = {
     INSERT INTO jobs (customer_id, sector, title, trade, suburb, postcode, address, region, description, requirements, budget, timing)
     VALUES (@customer_id, @sector, @title, @trade, @suburb, @postcode, @address, @region, @description, @requirements, @budget, @timing)`),
   insertPhoto: db.prepare('INSERT INTO job_photos (job_id, filename) VALUES (?, ?)'),
+  // Open jobs like this one, nearest first, for when this one's been filled.
+  related: db.prepare(`
+    SELECT j.id, j.sector, j.title, j.trade, j.suburb, j.region, j.budget, j.timing, j.description, j.created_at,
+      (SELECT COUNT(*) FROM quotes WHERE job_id = j.id AND status != 'withdrawn') AS quote_count,
+      (SELECT COUNT(*) FROM job_photos WHERE job_id = j.id) AS photo_count
+    FROM jobs j WHERE j.status = 'open' AND j.trade = @trade AND j.id != @id
+    ORDER BY j.region = @region DESC, j.created_at DESC LIMIT 5`),
   postedToday: db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE customer_id = ? AND created_at > datetime('now', '-1 day')"),
   // Approved tradies who'd be told about a job like this one (see notify.jobPosted).
   tradiesFor: db.prepare(`
@@ -234,6 +242,7 @@ router.post(
     if (photos.skipped) flash(req, 'info', uploads.UNREADABLE);
 
     notify.jobPosted(id);
+    indexnow.submit(`/jobs/${id}`);
     if (!photos.skipped) {
       flash(req, 'success', newUser
         ? `Your job is live and your account is set up. We'll email you at ${newUser.email} as quotes come in.`
@@ -286,7 +295,13 @@ router.get('/jobs/:id', loadJob, (req, res) => {
 
   // Only the job owner, the winning tradie and admins see anything past "taking quotes".
   if (job.status !== 'open' && !isOwner && !isAwardedTradie) {
-    return res.render('pages/error', { title: 'Job filled', message: 'This job has been awarded to another tradie.' });
+    return res.render('pages/error', {
+      title: 'Job filled',
+      message: 'This job has been awarded to another tradie.',
+      related: q.related.all({ trade: job.trade, region: job.region, id: job.id }),
+      relatedTrade: job.trade,
+      relatedRegion: job.region,
+    });
   }
 
   let awardedTradie = null;
@@ -342,6 +357,7 @@ router.post('/jobs/:id/cancel', requireLogin, loadJob, ownsJob, requireJobAction
     q.cancelJob.run(req.job.id);
     q.declineAll.run(req.job.id);
   })();
+  indexnow.submit(`/jobs/${req.job.id}`);
   // Close any checkout page that's still open, so nobody can pay for a cancelled job.
   if (payment) payments.expireCheckout(payment).catch((err) => console.error('Could not expire checkout:', err.message));
   flash(req, 'success', 'Job closed. Tradies can no longer see it.');
@@ -427,6 +443,8 @@ router.post('/quotes/:id/accept', requireLogin, (req, res, next) => {
     q.declineOthers.run(job.id, quote.id);
   })();
   notify.quoteAccepted(quote.id);
+  // The job page drops out of search now it's filled.
+  indexnow.submit(`/jobs/${job.id}`);
   flash(req, 'success', 'Quote accepted. Pay now to lock it in. We hold the money until you confirm the job is done.');
   res.redirect(`/jobs/${job.id}#payment`);
 });

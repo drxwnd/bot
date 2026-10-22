@@ -1351,6 +1351,27 @@ td form {
   margin-top: 4px;
 }
 
+/* Real price range on trade pages */
+.price-guide {
+  border-left: 3px solid var(--accent);
+  background: var(--white);
+  padding: 14px 18px;
+  margin-bottom: 28px;
+  border-radius: 0 var(--r) var(--r) 0;
+}
+
+.price-guide .price-range {
+  margin: 0 0 6px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-stretch: 85%;
+}
+
+.price-guide p:last-child {
+  margin: 0;
+}
+
 .newest-users summary {
   cursor: pointer;
   font-weight: 600;

@@ -14,6 +14,7 @@ function seoDefaults(req, res, next) {
   res.locals.jsonld = [];
   res.locals.breadcrumbs = null;
   res.locals.googleVerification = process.env.GOOGLE_SITE_VERIFICATION || '';
+  res.locals.bingVerification = config.bingVerification;
   if (isPrivate) res.set('X-Robots-Tag', 'noindex, nofollow');
 
   // Error pages (not found, job closed, no access) should never be indexed.
@@ -74,7 +75,7 @@ function faqPage(faqs) {
   };
 }
 
-function service({ name, description, path, areaServed = 'Western Australia', serviceType }) {
+function service({ name, description, path, areaServed = 'Western Australia', serviceType, prices }) {
   return {
     '@context': 'https://schema.org',
     '@type': 'Service',
@@ -84,6 +85,10 @@ function service({ name, description, path, areaServed = 'Western Australia', se
     serviceType: serviceType || name,
     provider: { '@id': url('/#org') },
     areaServed: { '@type': 'AdministrativeArea', name: areaServed },
+    // The typical range of real paid jobs, when there are enough of them (see priceGuide).
+    ...(prices
+      ? { offers: { '@type': 'AggregateOffer', priceCurrency: 'AUD', lowPrice: (prices.low / 100).toFixed(2), highPrice: (prices.high / 100).toFixed(2), offerCount: prices.jobs } }
+      : {}),
   };
 }
 

@@ -2,6 +2,17 @@
 <div class="wrap narrow page">
   <h1><%= title %></h1>
   <p class="muted" style="font-size:1.08rem"><%= message %></p>
-  <p style="margin-top:28px"><a class="btn ghost" href="/">Back to the home page</a></p>
+  <% if (typeof related !== 'undefined' && related.length) { %>
+    <h2 style="font-size:1.3rem;margin-top:36px">Open <%= tradeName[relatedTrade].toLowerCase() %> jobs</h2>
+    <div class="job-rows">
+      <% related.forEach(job => { %><%- include('../partials/job-row', { job }) %><% }) %>
+    </div>
+    <p class="section-link">
+      <a href="/jobs?trade=<%= relatedTrade %>">All open <%= tradeName[relatedTrade].toLowerCase() %> jobs</a>
+      <% if (TRADE_INFO[relatedTrade]) { %> &middot; <a href="/trades/<%= relatedTrade %>/<%= relatedRegion %>"><%= TRADE_INFO[relatedTrade].plural %> in <%= REGION_INFO[relatedRegion].name %></a><% } %>
+    </p>
+  <% } else { %>
+    <p style="margin-top:28px"><a class="btn ghost" href="/">Back to the home page</a></p>
+  <% } %>
 </div>
 <%- include('../partials/foot') %>

@@ -7,11 +7,18 @@
     <% } else { %>
       <p>Get quotes from checked <%= info.plural.toLowerCase() %> across Perth and regional WA. Posting a job is free, and your payment is held until the work is done.</p>
     <% } %>
-    <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?trade=<%= trade.slug %>">Get <%= trade.name.toLowerCase() %> quotes</a></p>
+    <p style="margin-top:24px"><a class="btn accent big" href="/jobs/new?trade=<%= trade.slug %><%= region ? `&region=${region.slug}` : '' %>">Post a <%= trade.name.toLowerCase() %> job</a></p>
   </div>
 
   <div class="split page" style="padding-top:8px">
     <div class="doc">
+      <% if (prices) { %>
+        <h2>What <%= trade.name.toLowerCase() %> costs<%= region ? ` in ${label}` : ' in WA' %></h2>
+        <div class="price-guide">
+          <p class="price-range"><%= money(prices.low).replace(/\.00$/, '') %> to <%= money(prices.high).replace(/\.00$/, '') %></p>
+          <p class="small muted">Most <%= trade.name.toLowerCase() %> jobs paid through <%= siteName %><%= region ? ` in ${label}` : '' %> in the last year fell in this range, and the middle price was <%= money(prices.median).replace(/\.00$/, '') %>. Based on <%= prices.jobs %> paid jobs. Your price depends on the size of the job, so post yours for an exact quote.</p>
+        </div>
+      <% } %>
       <h2>Common <%= trade.name.toLowerCase() %> jobs</h2>
       <ul class="tick-list">
         <% info.jobs.forEach(j => { %><li><%= j %></li><% }) %>
