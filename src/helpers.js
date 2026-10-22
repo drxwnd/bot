@@ -72,6 +72,19 @@ function validAbn(abn) {
   return digits.reduce((sum, n, i) => sum + n * weights[i], 0) % 89 === 0;
 }
 
+// The last `count` calendar months, oldest first: { key: '2026-10', label: 'Oct', long: 'October 2026' }.
+function lastMonths(count = 12) {
+  const now = new Date();
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (count - 1 - i), 1));
+    return {
+      key: d.toISOString().slice(0, 7),
+      label: d.toLocaleDateString('en-AU', { month: 'short', timeZone: 'UTC' }),
+      long: d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+    };
+  });
+}
+
 function list(value) {
   if (Array.isArray(value)) return value;
   if (value === undefined || value === null || value === '') return [];
@@ -120,6 +133,7 @@ module.exports = {
   formatAbn,
   validAbn,
   list,
+  lastMonths,
   hasContactDetails,
   oneLine,
   STATUS_LABEL,

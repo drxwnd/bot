@@ -1351,6 +1351,11 @@ td form {
   margin-top: 4px;
 }
 
+.newest-users summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
 .stats span {
   font-size: 0.82rem;
   color: var(--muted);

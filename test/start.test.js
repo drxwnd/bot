@@ -148,3 +148,22 @@ test('logged-out visitors can open the job form, and a multipart post still need
   const look = await browser().get('/start?path=look');
   assert.strictEqual(look.location, '/how-it-works');
 });
+
+test('the admin page counts users by type', async () => {
+  const bcrypt = require('bcryptjs');
+  db.prepare("INSERT INTO users (email, password_hash, name, role) VALUES ('boss@test.local', ?, 'Boss', 'admin')").run(bcrypt.hashSync('longpassword', 4));
+  const admin = browser();
+  await admin.get('/login');
+  await admin.post('/login', { email: 'boss@test.local', password: 'longpassword' });
+  const res = await admin.get('/admin');
+  assert.strictEqual(res.status, 200);
+  // From the tests above: Mia posted a job as a new customer, Terry signed up as a tradie with no
+  // business details yet, and the disabled login used for the "email taken" check isn't counted.
+  assert.match(res.text, /<span>Customers<\/span><b>1<\/b>/);
+  assert.match(res.text, /<span>Tradie businesses<\/span><b>1<\/b>/);
+  assert.match(res.text, /Customer accounts<\/dt><dd>1 <span class="small muted">\(1 have posted a job\)/);
+  assert.match(res.text, /Tradies not finished<\/dt><dd>1 /);
+  assert.match(res.text, /Everyone with a login<\/dt><dd><strong>3<\/strong>/);
+  assert.match(res.text, /2 new accounts \(1 customer, 1 tradie\)/);
+  assert.match(res.text, /mia@test\.local/);
+});

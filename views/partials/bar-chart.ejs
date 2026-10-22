@@ -1,36 +1,40 @@
 <%
-  // Column chart of money per month. One series, so no legend; the heading says what it shows.
+  // Column chart per month. One series, so no legend; the heading says what it shows.
   // Each column has a hover/focus tooltip, and the same numbers are in a table on the page.
   // Narrow cards pass a smaller width so the text stays readable when the chart is scaled down.
+  // Money by default (m.cents); pass counts: true to chart m.n instead, with m.tip as the tooltip.
   const W = typeof width !== 'undefined' ? width : 640, H = typeof height !== 'undefined' ? height : 220, L = 48, R = 6, T = 22, B = 28;
+  const isCount = typeof counts !== 'undefined' && counts;
   const plotW = W - L - R, plotH = H - T - B;
-  const maxCents = Math.max(...months.map(m => m.cents), 0);
-  // A clean top for the scale: 1, 2 or 5 times a power of ten, in dollars.
-  const niceTop = (v) => { if (v <= 0) return 100; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (v <= m * p) return m * p; return 10 * p; };
-  const top = niceTop(maxCents / 100);
+  // Each column's value in the units on the axis: dollars, or a plain count.
+  const val = (m) => isCount ? m.n : m.cents / 100;
+  const maxVal = Math.max(...months.map(val), 0);
+  // A clean top for the scale: 1, 2 or 5 times a power of ten. Counts stay whole numbers.
+  const niceTop = (v) => { if (v <= 0) return isCount ? 4 : 100; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (v <= m * p && (!isCount || Number.isInteger(m * p / 2))) return m * p; return 10 * p; };
+  const top = niceTop(maxVal);
   const ticks = [0, top / 2, top];
-  const short = (d) => d >= 1000 ? `$${(d / 1000).toFixed(d % 1000 ? 1 : 0)}K` : `$${d}`;
+  const short = (d) => isCount ? String(d) : d >= 1000 ? `$${(d / 1000).toFixed(d % 1000 ? 1 : 0)}K` : `$${d}`;
   const band = plotW / months.length;
   const bw = Math.min(24, band * 0.6);
-  const y = (cents) => T + plotH - (cents / 100 / top) * plotH;
-  const lastWithMoney = months.map(m => m.cents > 0).lastIndexOf(true);
-  const maxIndex = months.findIndex(m => m.cents === maxCents && maxCents > 0);
+  const y = (v) => T + plotH - (v / top) * plotH;
+  const lastWithValue = months.map(m => val(m) > 0).lastIndexOf(true);
+  const maxIndex = months.findIndex(m => val(m) === maxVal && maxVal > 0);
 %>
 <figure class="chart">
   <svg viewBox="0 0 <%= W %> <%= H %>" role="img" aria-label="<%= label %>">
-    <% ticks.forEach(t => { const ty = y(t * 100); %>
+    <% ticks.forEach(t => { const ty = y(t); %>
       <line x1="<%= L %>" x2="<%= W - R %>" y1="<%= ty %>" y2="<%= ty %>" class="<%= t === 0 ? 'base' : 'grid' %>"/>
       <text x="<%= L - 8 %>" y="<%= ty + 4 %>" class="tick" text-anchor="end"><%= short(t) %></text>
     <% }) %>
     <% months.forEach((m, i) => {
       const cx = L + band * i + band / 2;
-      const h = Math.max(0, T + plotH - y(m.cents));
+      const h = Math.max(0, T + plotH - y(val(m)));
       const x = cx - bw / 2, by = T + plotH - h, r = Math.min(4, h);
     %>
-      <g class="bar" tabindex="0" data-tip="<%= m.long %>: <%= money(m.cents) %><%= m.jobs ? ` from ${m.jobs} job${m.jobs === 1 ? '' : 's'}` : '' %>">
+      <g class="bar" tabindex="0" data-tip="<%= m.tip || `${m.long}: ${money(m.cents)}${m.jobs ? ` from ${m.jobs} job${m.jobs === 1 ? '' : 's'}` : ''}` %>">
         <rect class="hit" x="<%= L + band * i %>" y="<%= T %>" width="<%= band %>" height="<%= plotH %>"/>
         <% if (h > 0) { %><path d="M<%= x %>,<%= T + plotH %> V<%= by + r %> Q<%= x %>,<%= by %> <%= x + r %>,<%= by %> H<%= x + bw - r %> Q<%= x + bw %>,<%= by %> <%= x + bw %>,<%= by + r %> V<%= T + plotH %> Z"/><% } %>
-        <% if (h > 0 && (i === maxIndex || i === lastWithMoney)) { %><text x="<%= cx %>" y="<%= by - 6 %>" class="val" text-anchor="middle"><%= short(Math.round(m.cents / 100)) %></text><% } %>
+        <% if (h > 0 && (i === maxIndex || i === lastWithValue)) { %><text x="<%= cx %>" y="<%= by - 6 %>" class="val" text-anchor="middle"><%= short(Math.round(val(m))) %></text><% } %>
         <text x="<%= cx %>" y="<%= H - 8 %>" class="tick" text-anchor="middle"><%= m.label %></text>
       </g>
     <% }) %>

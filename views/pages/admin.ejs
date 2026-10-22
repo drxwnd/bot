@@ -16,6 +16,57 @@
     <div><span>Tradies waiting</span><b><%= tradies.filter(t => t.status === 'pending').length %></b></div>
   </div>
 
+  <h2 id="users" style="font-size:1.4rem">Users</h2>
+  <div class="stats" style="margin-bottom:20px">
+    <div><span>Customers</span><b><%= users.customers %></b></div>
+    <div><span>Tradie businesses</span><b><%= users.tradies %></b></div>
+    <div><span>Team logins</span><b><%= users.team %></b></div>
+    <div><span>New in the last 30 days</span><b><%= users.new_30d %></b></div>
+  </div>
+  <div class="split users-split" style="margin:0 0 20px;gap:40px">
+    <div>
+      <dl class="kv">
+        <dt>Customer accounts</dt><dd><%= users.customers %> <span class="small muted">(<%= users.customers_posted %> have posted a job)</span></dd>
+        <dt>Tradies approved</dt><dd><%= users.tradies_approved %> <span class="small muted">can quote now</span></dd>
+        <dt>Tradies waiting for you</dt><dd><%= users.tradies_pending %><% if (users.tradies_pending) { %> <a class="small" href="#tradies">check them</a><% } %></dd>
+        <dt>Tradies not finished</dt><dd><%= users.tradies_unfinished %> <span class="small muted">signed up, no business details yet</span></dd>
+        <% if (users.tradies_rejected) { %><dt>Tradies rejected</dt><dd><%= users.tradies_rejected %></dd><% } %>
+        <dt>Team logins</dt><dd><%= users.team %> <span class="small muted">workers, managers and staff on someone's account</span></dd>
+        <dt>Tradebench staff</dt><dd><%= users.staff %></dd>
+        <dt>Everyone with a login</dt><dd><strong><%= users.logins %></strong></dd>
+        <dt>New sign-ups</dt><dd><%= users.new_7d %> this week, <%= users.new_30d %> in 30 days</dd>
+      </dl>
+    </div>
+    <div>
+      <h3 style="font-size:1rem;margin:0 0 6px">New accounts each month</h3>
+      <%- include('../partials/bar-chart', { months: signups, counts: true, width: 520, height: 210, label: 'New customer and tradie accounts in each of the last twelve months' }) %>
+      <p class="small muted" style="margin:6px 0 0">Customers and tradie businesses. Hover a month for the split.</p>
+    </div>
+  </div>
+  <details class="newest-users" style="margin-bottom:48px">
+    <summary>Newest accounts</summary>
+    <div class="table-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Name</th><th>Type</th><th>Email</th><th>Joined</th></tr></thead>
+        <tbody>
+          <% if (!newestUsers.length) { %><tr><td colspan="4" class="muted">Nobody has signed up yet.</td></tr><% } %>
+          <% newestUsers.forEach(u => { %>
+            <tr>
+              <td><%= u.role === 'tradie' && u.business_name ? u.business_name : u.name %><% if (u.role === 'tradie' && u.business_name) { %><br><span class="small muted"><%= u.name %></span><% } else if (u.company) { %><br><span class="small muted"><%= u.company %></span><% } %></td>
+              <td>
+                <% if (u.role === 'customer') { %>Customer<% if (u.jobs) { %> <span class="small muted">· <%= u.jobs %> job<%= u.jobs === 1 ? '' : 's' %></span><% } %>
+                <% } else if (!u.profile_status) { %>Tradie <span class="small muted">· no details yet</span>
+                <% } else { %>Tradie <span class="tag <%= u.profile_status %>"><%= u.profile_status %></span><% } %>
+              </td>
+              <td><a href="mailto:<%= u.email %>"><%= u.email %></a></td>
+              <td class="muted"><%= ago(u.created_at) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
   <div class="split" style="margin:8px 0 48px;gap:40px">
     <div>
       <h2 style="font-size:1.2rem">Last 30 days</h2>

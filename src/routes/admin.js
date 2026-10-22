@@ -6,7 +6,7 @@ const { flash, requireRole } = require('../middleware');
 const { can } = require('../permissions');
 const config = require('../config');
 const QRCode = require('qrcode');
-const { feeFor, money, feeLabel } = require('../helpers');
+const { feeFor, money, feeLabel, lastMonths } = require('../helpers');
 
 const router = express.Router();
 router.use(requireRole('admin'));
@@ -48,14 +48,68 @@ const q = {
       (SELECT COUNT(*) FROM tradie_profiles WHERE status = 'approved') AS tradies_live,
       (SELECT COUNT(*) FROM tradie_profiles WHERE status = 'approved' AND payouts_enabled = 1) AS tradies_payouts,
       (SELECT COUNT(*) FROM payments WHERE disputed = 1) AS disputes`),
+  // People with a login, split by what they are. An account owner is a customer or a tradie business;
+  // team logins act on someone else's account. Removed team logins ('!') aren't counted.
+  users: db.prepare(`
+    WITH owners AS (
+      SELECT u.* FROM users u
+      WHERE u.password_hash != '!'
+        AND NOT EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = u.id AND m.status = 'active')
+    )
+    SELECT
+      (SELECT COUNT(*) FROM users WHERE password_hash != '!') AS logins,
+      (SELECT COUNT(*) FROM owners WHERE role = 'customer') AS customers,
+      (SELECT COUNT(DISTINCT j.customer_id) FROM jobs j JOIN owners o ON o.id = j.customer_id WHERE o.role = 'customer') AS customers_posted,
+      (SELECT COUNT(*) FROM owners WHERE role = 'tradie') AS tradies,
+      (SELECT COUNT(*) FROM owners o JOIN tradie_profiles p ON p.user_id = o.id WHERE p.status = 'approved') AS tradies_approved,
+      (SELECT COUNT(*) FROM owners o JOIN tradie_profiles p ON p.user_id = o.id WHERE p.status = 'pending') AS tradies_pending,
+      (SELECT COUNT(*) FROM owners o JOIN tradie_profiles p ON p.user_id = o.id WHERE p.status = 'rejected') AS tradies_rejected,
+      (SELECT COUNT(*) FROM owners o WHERE o.role = 'tradie' AND NOT EXISTS (SELECT 1 FROM tradie_profiles p WHERE p.user_id = o.id)) AS tradies_unfinished,
+      (SELECT COUNT(*) FROM team_members m JOIN users u ON u.id = m.user_id
+        WHERE m.status = 'active' AND u.password_hash != '!' AND u.role != 'admin') AS team,
+      (SELECT COUNT(*) FROM users WHERE role = 'admin' AND password_hash != '!') AS staff,
+      (SELECT COUNT(*) FROM owners WHERE role IN ('customer', 'tradie') AND created_at > datetime('now', '-7 days')) AS new_7d,
+      (SELECT COUNT(*) FROM owners WHERE role IN ('customer', 'tradie') AND created_at > datetime('now', '-30 days')) AS new_30d`),
+  signupsByMonth: db.prepare(`
+    SELECT strftime('%Y-%m', u.created_at) AS month, u.role, COUNT(*) AS n FROM users u
+    WHERE u.role IN ('customer', 'tradie') AND u.password_hash != '!'
+      AND NOT EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = u.id AND m.status = 'active')
+      AND u.created_at >= date('now', 'start of month', '-11 months')
+    GROUP BY month, u.role`),
+  newestUsers: db.prepare(`
+    SELECT u.id, u.name, u.email, u.role, u.company, u.created_at, p.business_name, p.status AS profile_status,
+      (SELECT COUNT(*) FROM jobs WHERE customer_id = u.id) AS jobs
+    FROM users u LEFT JOIN tradie_profiles p ON p.user_id = u.id
+    WHERE u.role IN ('customer', 'tradie') AND u.password_hash != '!'
+      AND NOT EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = u.id AND m.status = 'active')
+    ORDER BY u.created_at DESC, u.id DESC LIMIT 10`),
   tradieForPayment: db.prepare(`
     SELECT tp.* FROM payments p JOIN quotes q ON q.id = p.quote_id
     JOIN tradie_profiles tp ON tp.user_id = q.tradie_id WHERE p.id = ?`),
 };
 
+// New customer and tradie accounts in each of the last 12 months, for the chart.
+function signupMonths() {
+  const rows = q.signupsByMonth.all();
+  const count = (key, role) => (rows.find((r) => r.month === key && r.role === role) || { n: 0 }).n;
+  return lastMonths(12).map((m) => {
+    const customers = count(m.key, 'customer');
+    const tradies = count(m.key, 'tradie');
+    const n = customers + tradies;
+    return {
+      ...m,
+      n,
+      tip: `${m.long}: ${n} new account${n === 1 ? '' : 's'} (${customers} customer${customers === 1 ? '' : 's'}, ${tradies} tradie${tradies === 1 ? '' : 's'})`,
+    };
+  });
+}
+
 router.get('/', (req, res) => {
   res.render('pages/admin', {
     title: 'Admin',
+    users: q.users.get(),
+    signups: signupMonths(),
+    newestUsers: q.newestUsers.all(),
     tradies: q.tradies.all(),
     jobs: q.jobs.all(),
     payments: q.payments.all(),

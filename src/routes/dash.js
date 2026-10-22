@@ -10,7 +10,7 @@ const db = require('../db');
 const { flash, requireLogin, requireRole, requireCan, logIn, logOutEverywhere } = require('../middleware');
 const { can } = require('../permissions');
 const { oneOf } = require('../constants');
-const { hasContactDetails, oneLine } = require('../helpers');
+const { hasContactDetails, oneLine, lastMonths } = require('../helpers');
 const { limit } = require('../ratelimit');
 
 const router = express.Router();
@@ -88,20 +88,11 @@ const q = {
 // Last 12 months (oldest first) with what was paid out in each.
 function monthSeries(rows) {
   const byMonth = Object.fromEntries(rows.map((r) => [r.month, r]));
-  const out = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i -= 1) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const key = d.toISOString().slice(0, 7);
-    out.push({
-      key,
-      label: d.toLocaleDateString('en-AU', { month: 'short', timeZone: 'UTC' }),
-      long: d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
-      cents: byMonth[key] ? byMonth[key].cents : 0,
-      jobs: byMonth[key] ? byMonth[key].jobs : 0,
-    });
-  }
-  return out;
+  return lastMonths(12).map((m) => ({
+    ...m,
+    cents: byMonth[m.key] ? byMonth[m.key].cents : 0,
+    jobs: byMonth[m.key] ? byMonth[m.key].jobs : 0,
+  }));
 }
 
 // What a quote means to the tradie right now.
