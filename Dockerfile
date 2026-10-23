@@ -1,4 +1,4 @@
-FROM node:22-slim AS deps
+FROM node:25-slim AS deps
 # better-sqlite3 compiles itself from source on install, which needs Python and a C++ compiler.
 # Only this build stage has them; the image that runs the site stays slim.
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:22-slim
+FROM node:25-slim
 WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
