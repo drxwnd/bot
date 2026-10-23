@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
-const { flash, logIn, logOutEverywhere, safeEqual } = require('../middleware');
+const { flash, logIn, logOut, logOutEverywhere, safeEqual } = require('../middleware');
 const { limit } = require('../ratelimit');
 const notify = require('../notify');
 const { unsubscribeToken } = require('../emails');
@@ -232,7 +232,7 @@ router.post('/unsubscribe', (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  req.session = null;
+  logOut(req);
   res.redirect('/');
 });
 

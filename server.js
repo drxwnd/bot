@@ -66,11 +66,21 @@ app.use(
         'script-src': ["'self'", ...(config.plausibleDomain ? ['https://plausible.io'] : [])],
         'connect-src': ["'self'", ...(config.plausibleDomain ? ['https://plausible.io'] : [])],
         'form-action': ["'self'", 'https://checkout.stripe.com', 'https://connect.stripe.com'],
+        // No page is ever shown inside a frame, ours or anyone else's (stops clickjacking).
+        'frame-ancestors': ["'none'"],
         'upgrade-insecure-requests': config.isProd ? [] : null,
       },
     },
+    frameguard: { action: 'deny' },
+    // Two years, every subdomain, and eligible for the browsers' built-in HTTPS-only list.
+    strictTransportSecurity: { maxAge: 63072000, includeSubDomains: true, preload: true },
   }),
 );
+// The site never needs the camera, microphone, location or payment APIs, so pages can't ask for them.
+app.use((req, res, next) => {
+  res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
+  next();
+});
 
 // Stripe needs the raw body to verify webhook signatures, so this is mounted before the body parsers.
 app.use('/stripe', require('./src/routes/webhook'));

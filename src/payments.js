@@ -90,7 +90,17 @@ async function payoutDashboardLink(profile) {
 
 // ---- Customer payment ----
 
-async function startCheckout(job, quote, customer) {
+// A double-clicked Pay button sends two requests at once. Both would find no open checkout page and
+// make one each, and the customer could pay twice, so the second waits for the first and gets its page.
+const checkingOut = new Map();
+function startCheckout(job, quote, customer) {
+  if (checkingOut.has(job.id)) return checkingOut.get(job.id);
+  const started = doStartCheckout(job, quote, customer).finally(() => checkingOut.delete(job.id));
+  checkingOut.set(job.id, started);
+  return started;
+}
+
+async function doStartCheckout(job, quote, customer) {
   let payment = q.paymentForJob.get(job.id);
   if (!payment) {
     const info = q.insertPayment.run(
@@ -163,8 +173,9 @@ function markHeld(paymentId, paymentIntent, chargeId) {
   } else {
     // Paid for a job that isn't waiting for payment any more (it was cancelled while the
     // checkout page was open). Send the money straight back and tell the admin.
-    refund(q.paymentById.get(paymentId)).catch((err) => console.error(`Auto-refund of payment ${paymentId} failed:`, err));
-    notify.adminAlert(`Payment ${paymentId} came in for job ${payment.job_id} after it was closed, so it was refunded automatically. Check it went through in Stripe.`);
+    // The customer did nothing wrong, so this one goes back in full, fee included.
+    refund(q.paymentById.get(paymentId), { full: true }).catch((err) => console.error(`Auto-refund of payment ${paymentId} failed:`, err));
+    notify.adminAlert(`Payment ${paymentId} came in for job ${payment.job_id} after it was closed, so it was refunded in full automatically. Check it went through in Stripe.`);
   }
   return true;
 }
@@ -195,16 +206,21 @@ async function confirmCheckoutSession(sessionOrId) {
   }
 
   const pi = await stripe.paymentIntents.retrieve(session.payment_intent);
-  if (payment.status !== 'pending' && payment.stripe_payment_intent && payment.stripe_payment_intent !== pi.id) {
-    // A second payment for a job that's already paid. Refund the extra one, less the payment fee.
-    await stripe.refunds.create(
-      { payment_intent: pi.id, amount: payment.amount_cents },
-      { idempotencyKey: `dup-refund-${pi.id}` },
-    );
-    notify.adminAlert(`A second payment (${pi.id}) came in for job ${payment.job_id}, which was already paid. The quote amount was refunded automatically.`);
-    return false;
-  }
-  return markHeld(paymentId, pi.id, pi.latest_charge);
+  if (markHeld(paymentId, pi.id, pi.latest_charge)) return true;
+  // Read it again: another confirmation may have marked it paid while we waited on Stripe.
+  const now = q.paymentById.get(paymentId);
+  if (now.stripe_payment_intent && now.stripe_payment_intent !== pi.id) await refundDuplicate(now, pi, session);
+  return false;
+}
+
+// A second payment for a job that's already paid. It's our side's doing, so all of it goes back,
+// secure payment fee included.
+async function refundDuplicate(payment, pi, session) {
+  await stripe.refunds.create(
+    { payment_intent: pi.id, amount: session.amount_total },
+    { idempotencyKey: `dup-refund-${pi.id}` },
+  );
+  notify.adminAlert(`A second payment (${pi.id}) came in for job ${payment.job_id}, which was already paid. It was refunded in full automatically.`);
 }
 
 // ---- Release / refund ----
@@ -227,8 +243,9 @@ async function release(payment, tradieProfile) {
   return exclusive(payment.id, () => doRelease(q.paymentById.get(payment.id), tradieProfile));
 }
 
-async function refund(payment) {
-  return exclusive(payment.id, () => doRefund(q.paymentById.get(payment.id)));
+// `full` also gives back the secure payment fee, for refunds that are our side's doing.
+async function refund(payment, { full = false } = {}) {
+  return exclusive(payment.id, () => doRefund(q.paymentById.get(payment.id), full));
 }
 
 async function doRelease(payment, tradieProfile) {
@@ -262,9 +279,9 @@ async function doRelease(payment, tradieProfile) {
   }
 }
 
-async function doRefund(payment) {
+async function doRefund(payment, full = false) {
   if (payment.status !== 'held') throw new Error('Only held payments can be refunded');
-  const amount = payment.amount_cents;
+  const amount = payment.amount_cents + (full ? payment.customer_fee_cents : 0);
   // After a part refund in Stripe, only the rest of the quote amount is still to go back.
   const remaining = amount - (payment.refunded_cents || 0);
   if (stripe && remaining > 0) {

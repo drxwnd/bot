@@ -83,6 +83,7 @@ const q = {
   user: db.prepare('SELECT * FROM users WHERE id = ?'),
   updateUser: db.prepare('UPDATE users SET name = ?, phone = ?, company = ?, email_alerts = ? WHERE id = ?'),
   setPassword: db.prepare('UPDATE users SET password_hash = ? WHERE id = ?'),
+  cancelResets: db.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE user_id = ? AND used_at IS NULL"),
 };
 
 // Last 12 months (oldest first) with what was paid out in each.
@@ -332,6 +333,8 @@ router.post('/dashboard/account/password', requireLogin, passwordLimit, async (r
   else if (next.length > 200) flash(req, 'error', 'Use 200 characters or fewer.');
   else {
     q.setPassword.run(await bcrypt.hash(next, 11), me.id);
+    // A reset link sent before the change would otherwise still let someone set a new password.
+    q.cancelResets.run(me.id);
     // Every other device is logged out; this one stays logged in.
     logOutEverywhere(me.id);
     logIn(req, me.id);

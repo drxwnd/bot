@@ -347,3 +347,17 @@ test('backups: one file per day, however often the site restarts', async () => {
   assert.strictEqual(await backup.backup({ force: true }), first);
   assert.deepStrictEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.db')), [path.basename(first)]);
 });
+test('refunds that are our side doing give back the secure payment fee too', async () => {
+  const payments = require('../src/payments');
+  const customerId = Number(db.prepare("INSERT INTO users (email, password_hash, name, role) VALUES ('late@test.local', '!', 'Late', 'customer')").run().lastInsertRowid);
+  const tradieId = Number(db.prepare("INSERT INTO users (email, password_hash, name, role) VALUES ('late-tradie@test.local', '!', 'Tradie', 'tradie')").run().lastInsertRowid);
+  const jobId = Number(db.prepare(`
+    INSERT INTO jobs (customer_id, title, trade, suburb, postcode, region, description, budget, timing, status)
+    VALUES (?, 'Paid after closing', 'tiling', 'Subiaco', '6008', 'central', 'Test', 'under-500', 'flexible', 'paid')`).run(customerId).lastInsertRowid);
+  const quoteId = db.prepare("INSERT INTO quotes (job_id, tradie_id, amount_cents, message, status) VALUES (?, ?, 20000, 'x', 'accepted')").run(jobId, tradieId).lastInsertRowid;
+  const id = db.prepare(`
+    INSERT INTO payments (job_id, quote_id, amount_cents, fee_cents, customer_fee_cents, status, stripe_charge_id, stripe_payment_intent)
+    VALUES (?, ?, 20000, 1500, 400, 'held', 'ch_late', 'pi_late')`).run(jobId, quoteId).lastInsertRowid;
+  await payments.refund(one('SELECT * FROM payments WHERE id = ?', id), { full: true });
+  assert.strictEqual(one('SELECT refunded_cents FROM payments WHERE id = ?', id).refunded_cents, 20400);
+});

@@ -281,6 +281,15 @@ CREATE TABLE IF NOT EXISTS tradie_photos (
 CREATE INDEX IF NOT EXISTS tradie_photos_user ON tradie_photos(user_id);
 `);
 
+// Sessions live in the cookie, so logging out records that session's id here and the cookie stops
+// working even if someone copied it. Rows are dropped once the cookie would have expired anyway.
+db.exec(`
+CREATE TABLE IF NOT EXISTS revoked_sessions (
+  sid        TEXT PRIMARY KEY,
+  expires_at TEXT NOT NULL
+);
+`);
+
 // Indexes for the lookups the site does on every page.
 db.exec(`
 CREATE INDEX IF NOT EXISTS quotes_tradie ON quotes(tradie_id, status);

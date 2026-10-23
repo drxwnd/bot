@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const sharp = require('sharp');
 const config = require('./config');
+const { hit } = require('./ratelimit');
 
 const privateDir = path.join(config.dataDir, 'private-uploads');
 fs.mkdirSync(config.uploadDir, { recursive: true });
@@ -24,9 +25,13 @@ const MAX_MB = 12;
 // Biggest image we'll decode, in pixels. A 48 megapixel phone photo fits; a small file that claims to be
 // a huge image (which would need gigabytes of memory to open) is refused before it's decoded.
 const MAX_PIXELS = 60_000_000;
-// Uploads held in memory at once. The server has 512MB, and each request can carry up to 6 photos.
-const MAX_ACTIVE = 4;
+// Uploads held in memory at once. The server has 512MB and each request can carry up to 8 photos of
+// 12MB, so two at a time keeps the worst case under 200MB.
+const MAX_ACTIVE = 2;
 let active = 0;
+// Upload requests one account (or, logged out, one address) can make in 10 minutes, so a single
+// person can't keep every upload slot busy.
+const PER_PERSON = 20;
 
 // One image at a time, and nothing kept in sharp's cache between them, to keep memory steady.
 sharp.concurrency(1);
@@ -43,6 +48,9 @@ function receive(field, maxFiles) {
   });
   const handler = maxFiles === 1 ? m.single(field) : m.array(field, maxFiles);
   return (req, res, next) => {
+    if (!hit(`upload|${req.user ? `u${req.user.id}` : req.ip}`, PER_PERSON, 10 * 60 * 1000)) {
+      return res.status(429).render('pages/error', { title: 'Slow down', message: "That's a lot of uploads in a short time. Wait a few minutes, then try again." });
+    }
     if (active >= MAX_ACTIVE) {
       res.set('Retry-After', '10');
       return res.status(503).render('pages/error', { title: 'Busy right now', message: 'A lot of photos are being uploaded at the moment. Wait a few seconds, then go back and try again.' });

@@ -1,0 +1,13 @@
+# Weekly check for security fixes in the site's packages and its Docker base image.
+# Dependabot opens a pull request for each one; run the tests, then merge and deploy.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

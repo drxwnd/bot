@@ -356,3 +356,34 @@ test('password guessing on one account is slowed down across many addresses', as
   }
   assert.strictEqual(res.status, 429);
 });
+
+test('logging out ends that session, even for a copy of the cookie', async () => {
+  const b = browser();
+  await signup(b, 'customer', 'Lou', 'lou@test.local');
+  assert.strictEqual((await b.get('/dashboard')).status, 200);
+  // Someone copies the cookie before the owner logs out...
+  const stolen = browser();
+  Object.assign(stolen.cookies, b.cookies);
+  assert.strictEqual((await stolen.get('/dashboard')).status, 200);
+  await b.get('/dashboard');
+  await b.post('/logout');
+  // ...and it stops working the moment they do.
+  assert.strictEqual((await stolen.get('/dashboard')).status, 302);
+});
+
+test('changing your password cancels reset links sent before it', async () => {
+  const b = browser();
+  await signup(b, 'customer', 'Pia', 'pia@test.local');
+  const id = db.prepare("SELECT id FROM users WHERE email = 'pia@test.local'").get().id;
+  db.prepare("INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ('old-link', ?, datetime('now', '+1 hour'))").run(id);
+  await b.get('/dashboard/account');
+  await b.post('/dashboard/account/password', { current: 'longpassword', password: 'anotherlongpassword' });
+  assert.ok(db.prepare("SELECT used_at FROM password_resets WHERE token_hash = 'old-link'").get().used_at);
+});
+
+test('every page refuses to be framed and blocks device APIs', async () => {
+  const res = await fetch(base + '/');
+  assert.match(res.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  assert.strictEqual(res.headers.get('x-frame-options'), 'DENY');
+  assert.match(res.headers.get('permissions-policy'), /camera=\(\)/);
+});

@@ -11,10 +11,13 @@ function loadSession(req, res, next) {
   if (!req.session.csrf) req.session.csrf = crypto.randomBytes(24).toString('hex');
 
   req.user = req.session.uid ? getUser.get(req.session.uid) : null;
-  // The session must carry the user's current key, and the login mustn't have been disabled.
-  if (req.user && (req.session.sk !== req.user.session_key || req.user.disabled)) {
+  // The session must carry the user's current key, the login mustn't have been disabled, and this
+  // session mustn't have been logged out.
+  if (req.user && (req.session.sk !== req.user.session_key || req.user.disabled || isRevoked.get(req.session.sid || ''))) {
     req.user = null;
   }
+  // Sessions from before session ids existed get one, so logging out can end them too.
+  if (req.user && !req.session.sid) req.session.sid = crypto.randomBytes(16).toString('hex');
   if (req.session.uid && !req.user) {
     req.session.uid = null;
     req.session.sk = null;
@@ -50,7 +53,21 @@ const keyFor = db.prepare('SELECT session_key FROM users WHERE id = ?');
 function logIn(req, userId) {
   req.session.uid = userId;
   req.session.sk = keyFor.get(userId).session_key;
+  req.session.sid = crypto.randomBytes(16).toString('hex');
   req.session.csrf = crypto.randomBytes(24).toString('hex');
+}
+
+// Log out just this session. The cookie is cleared, and its id is remembered until the cookie
+// would have expired (30 days), so a copy of it can't be used either.
+const revoke = db.prepare("INSERT OR IGNORE INTO revoked_sessions (sid, expires_at) VALUES (?, datetime('now', '+31 days'))");
+const pruneRevoked = db.prepare("DELETE FROM revoked_sessions WHERE expires_at < datetime('now')");
+const isRevoked = db.prepare('SELECT 1 FROM revoked_sessions WHERE sid = ?');
+function logOut(req) {
+  if (req.session && req.session.sid) {
+    revoke.run(req.session.sid);
+    pruneRevoked.run();
+  }
+  req.session = null;
 }
 
 // Change a user's session key, which logs them out on every device.
@@ -116,4 +133,4 @@ function requireApprovedTradie(req, res, next) {
   res.redirect('/dashboard');
 }
 
-module.exports = { loadSession, flash, verifyCsrf, safeEqual, logIn, logOutEverywhere, requireLogin, requireRole, requireCan, requireApprovedTradie };
+module.exports = { loadSession, flash, verifyCsrf, safeEqual, logIn, logOut, logOutEverywhere, requireLogin, requireRole, requireCan, requireApprovedTradie };
