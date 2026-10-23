@@ -4,7 +4,7 @@
     <div class="profile-head">
       <% if (tradie.logo) { %><img class="initials logo-img" src="/uploads/<%= thumb(tradie.logo) %>" alt="<%= tradie.business_name %> logo" width="80" height="80"><% } else { %><div class="initials"><%= tradie.business_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') %></div><% } %>
       <div>
-        <h1 style="margin-bottom:6px"><%= tradie.business_name %></h1>
+        <h1 style="margin-bottom:6px"><%= tradie.business_name %> <% if (tradie.email_verified_at) { %><span class="tag verified" title="Email confirmed, and ABN, licence and insurance checked by us">Verified</span><% } %></h1>
         <div class="muted">
           <% if (avg) { %><span style="color:var(--accent)">★</span> <%= avg.toFixed(1) %> from <%= reviews.length %> review<%= reviews.length === 1 ? '' : 's' %> &middot; <% } %>
           <%= completed %> job<%= completed === 1 ? '' : 's' %> done through <%= siteName %>

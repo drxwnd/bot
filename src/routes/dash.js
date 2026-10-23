@@ -12,6 +12,9 @@ const { can } = require('../permissions');
 const { oneOf } = require('../constants');
 const { hasContactDetails, oneLine, lastMonths } = require('../helpers');
 const { limit } = require('../ratelimit');
+const config = require('../config');
+const twostep = require('../twostep');
+const verification = require('../verification');
 
 const router = express.Router();
 
@@ -301,7 +304,107 @@ router.get('/dashboard/payments', requireRole('customer'), (req, res) => {
 // ---- Account settings (everyone) ----
 
 router.get('/dashboard/account', requireLogin, (req, res) => {
-  res.render('pages/dash-account', { title: 'Account', dashNav: 'account', me: q.user.get(req.user.id) });
+  const me = q.user.get(req.user.id);
+  res.render('pages/dash-account', {
+    title: 'Account',
+    dashNav: 'account',
+    me,
+    backupCodesLeft: twostep.isOn(me) ? twostep.backupCodesLeft(me.id) : 0,
+    twoStepRequired: me.role === 'admin' && config.requireAdminTwoStep,
+  });
+});
+
+router.post('/dashboard/account/verify-email', requireLogin, (req, res) => {
+  if (req.user.email_verified_at) flash(req, 'info', 'Your email is already confirmed.');
+  else if (verification.send(req.user.id)) flash(req, 'success', `We've sent a new link to ${req.user.email}. It can take a minute to arrive; check junk too.`);
+  else flash(req, 'error', "We've sent a few links in the last hour. Wait a while, then try again.");
+  res.redirect('/dashboard/account');
+});
+
+// ---- Two-step login ----
+
+function twoStepPage(res, me, { setup = null, codes = null, justEnabled } = {}) {
+  res.render('pages/twostep-setup', {
+    title: 'Two-step login',
+    dashNav: 'account',
+    me,
+    setup,
+    codes,
+    justEnabled,
+    backupCodesLeft: twostep.isOn(me) ? twostep.backupCodesLeft(me.id) : 0,
+    twoStepRequired: me.role === 'admin' && config.requireAdminTwoStep,
+  });
+}
+
+const codeLimit = limit('twostep-setup', 10, 15 * 60 * 1000, (req, res) => {
+  flash(req, 'error', 'Too many tries. Wait 15 minutes and try again.');
+  res.redirect('/dashboard/account/two-step');
+});
+
+router.get('/dashboard/account/two-step', requireLogin, async (req, res, next) => {
+  try {
+    const me = q.user.get(req.user.id);
+    // A code waiting to be scanned (first set-up or a new phone) is shown; if it's off and there isn't
+    // one, a fresh one is made. If it's on with nothing pending, there's nothing to scan.
+    const setup = (await twostep.details(me.id)) || (twostep.isOn(me) ? null : await twostep.begin(me.id));
+    twoStepPage(res, me, { setup });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/dashboard/account/two-step/enable', requireLogin, codeLimit, async (req, res, next) => {
+  const codes = twostep.confirm(req.user.id, req.body.code);
+  if (!codes) {
+    flash(req, 'error', "That code didn't match. Check the time on your phone is set automatically, then try the newest code.");
+    return res.redirect('/dashboard/account/two-step');
+  }
+  // Every other device logs in again, now with a code.
+  logOutEverywhere(req.user.id);
+  logIn(req, req.user.id);
+  twoStepPage(res, q.user.get(req.user.id), { codes, justEnabled: true });
+});
+
+router.post('/dashboard/account/two-step/backup-codes', requireLogin, codeLimit, (req, res) => {
+  const me = q.user.get(req.user.id);
+  if (!twostep.isOn(me) || !twostep.check(me.id, req.body.code)) {
+    flash(req, 'error', "That code didn't work. Enter the code from your app.");
+    return res.redirect('/dashboard/account/two-step');
+  }
+  const codes = twostep.newBackupCodes(me.id);
+  twoStepPage(res, me, { codes });
+});
+
+router.post('/dashboard/account/two-step/disable', requireLogin, codeLimit, async (req, res) => {
+  const me = q.user.get(req.user.id);
+  if (me.role === 'admin' && config.requireAdminTwoStep) {
+    flash(req, 'error', 'Admin accounts must keep two-step login on. To move it to a new phone, set it up again below.');
+    return res.redirect('/dashboard/account/two-step');
+  }
+  const passwordOk = await bcrypt.compare(String(req.body.password || '').slice(0, 200), me.password_hash);
+  if (!passwordOk || !twostep.check(me.id, req.body.code)) {
+    flash(req, 'error', "Your password or code wasn't right.");
+    return res.redirect('/dashboard/account/two-step');
+  }
+  twostep.turnOff(me.id);
+  flash(req, 'success', 'Two-step login is off. You can turn it back on any time.');
+  res.redirect('/dashboard/account');
+});
+
+// Moving to a new phone: proves they have the current one (or a backup code), then starts a fresh setup.
+router.post('/dashboard/account/two-step/reset', requireLogin, codeLimit, async (req, res, next) => {
+  const me = q.user.get(req.user.id);
+  if (!twostep.isOn(me) || !twostep.check(me.id, req.body.code)) {
+    flash(req, 'error', "That code didn't work. Enter the code from your app, or a backup code.");
+    return res.redirect('/dashboard/account/two-step');
+  }
+  try {
+    await twostep.begin(me.id);
+  } catch (err) {
+    return next(err);
+  }
+  flash(req, 'info', 'Scan the new code with your new phone. Two-step login stays on, so you need a code to log in again.');
+  res.redirect('/dashboard/account/two-step');
 });
 
 router.post('/dashboard/account', requireLogin, (req, res) => {

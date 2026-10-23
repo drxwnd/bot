@@ -48,6 +48,9 @@ const config = {
   legalName: process.env.LEGAL_NAME || '',
 
   adminEmail: (process.env.ADMIN_EMAIL || '').toLowerCase(),
+  // Admin pages need two-step login turned on. Always on for the live site; ADMIN_TWO_STEP=1 turns it
+  // on locally (or in tests).
+  requireAdminTwoStep: process.env.NODE_ENV === 'production' || process.env.ADMIN_TWO_STEP === '1',
   supportEmail: process.env.SUPPORT_EMAIL || 'hello@trade-bench.com',
 
   dataDir: process.env.DATA_DIR || path.join(root, 'data'),

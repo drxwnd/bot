@@ -127,6 +127,10 @@ function passwordReset(user, link) {
   send(user, 'password_reset', E.passwordReset(user, link));
 }
 
+function verifyEmail(user, link) {
+  send(user, 'verify_email', E.verifyEmail(q.user.get(user.id) || user, link));
+}
+
 // A notification failing (bad data, a template bug) must never break the request that caused it.
 function safe(fn) {
   return (...args) => {
@@ -142,7 +146,7 @@ module.exports = {
   ...Object.fromEntries(
     Object.entries({
       jobPosted, quoteReceived, quoteAccepted, paymentHeld, paymentReleased, refunded,
-      tradieReviewed, tradieSubmitted, disputeOpened, teamInvite, passwordReset, adminAlert,
+      tradieReviewed, tradieSubmitted, disputeOpened, teamInvite, passwordReset, verifyEmail, adminAlert,
     }).map(([k, fn]) => [k, safe(fn)]),
   ),
   admins,

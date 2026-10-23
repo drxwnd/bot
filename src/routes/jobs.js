@@ -10,6 +10,7 @@ const { parseDollars, money, hasContactDetails, oneLine } = require('../helpers'
 const { limit } = require('../ratelimit');
 const accounts = require('../accounts');
 const indexnow = require('../indexnow');
+const verification = require('../verification');
 const seo = require('../seo');
 const { locate, errorMessage } = require('../locality');
 const { flash, verifyCsrf, logIn, requireLogin, requireRole, requireCan, requireApprovedTradie } = require('../middleware');
@@ -63,13 +64,14 @@ const q = {
       AND (',' || regions || ',') LIKE ('%,' || @region || ',%')
       AND (',' || sectors || ',') LIKE ('%,' || @sector || ',%')`),
   quotesForJob: db.prepare(`
-    SELECT q.*, u.name AS tradie_name, u.email AS tradie_email, u.phone AS tradie_phone,
+    SELECT q.*, u.name AS tradie_name, u.email AS tradie_email, u.phone AS tradie_phone, u.email_verified_at AS tradie_verified,
       p.business_name, p.licence_no, p.years_trading, p.insurer,
       (SELECT ROUND(AVG(rating), 1) FROM reviews WHERE tradie_id = q.tradie_id) AS rating,
       (SELECT COUNT(*) FROM reviews WHERE tradie_id = q.tradie_id) AS review_count
     FROM quotes q JOIN users u ON u.id = q.tradie_id JOIN tradie_profiles p ON p.user_id = q.tradie_id
     WHERE q.job_id = ? AND q.status != 'withdrawn' ORDER BY q.amount_cents ASC`),
   quote: db.prepare('SELECT * FROM quotes WHERE id = ?'),
+  customerVerified: db.prepare('SELECT 1 FROM users WHERE id = ? AND email_verified_at IS NOT NULL'),
   myQuote: db.prepare('SELECT * FROM quotes WHERE job_id = ? AND tradie_id = ?'),
   insertQuote: db.prepare(`
     INSERT INTO quotes (job_id, tradie_id, amount_cents, message, start_date) VALUES (?, ?, ?, ?, ?)
@@ -238,7 +240,10 @@ router.post(
       if (accounts.isTaken(err)) return fail(accounts.TAKEN);
       return next(err);
     }
-    if (newUser) logIn(req, values.customer_id);
+    if (newUser) {
+      logIn(req, values.customer_id);
+      verification.send(values.customer_id);
+    }
     if (photos.skipped) flash(req, 'info', uploads.UNREADABLE);
 
     notify.jobPosted(id);
@@ -328,6 +333,7 @@ router.get('/jobs/:id', loadJob, (req, res) => {
     jsonld: job.trade === 'other' ? [] : [seo.breadcrumbList(crumbs)],
     job,
     photos: q.photos.all(job.id),
+    customerVerified: Boolean(q.customerVerified.get(job.customer_id)),
     quotes,
     myQuote,
     accepted,

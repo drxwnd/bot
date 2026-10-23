@@ -281,6 +281,33 @@ CREATE TABLE IF NOT EXISTS tradie_photos (
 CREATE INDEX IF NOT EXISTS tradie_photos_user ON tradie_photos(user_id);
 `);
 
+// Email verification: a link emailed at sign-up proves the person owns the address. A verified email is
+// part of an account's "Verified" badge (and, for tradies, of being approved).
+addColumn('users', 'email_verified_at', 'TEXT');
+// Two-step login with an authenticator app. Secrets are stored encrypted (see src/twostep.js). The
+// pending one is waiting to be confirmed (first set-up, or a move to a new phone) while the current
+// one keeps working. last_step stops a code being used twice.
+addColumn('users', 'totp_secret', 'TEXT');
+addColumn('users', 'totp_pending', 'TEXT');
+addColumn('users', 'totp_enabled_at', 'TEXT');
+addColumn('users', 'totp_last_step', 'INTEGER');
+db.exec(`
+CREATE TABLE IF NOT EXISTS email_verifications (
+  token_hash TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email      TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at    TEXT
+);
+-- One-time backup codes for two-step login, for when the phone is lost. Only hashes are kept.
+CREATE TABLE IF NOT EXISTS recovery_codes (
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  used_at   TEXT,
+  PRIMARY KEY (user_id, code_hash)
+);
+`);
+
 // Sessions live in the cookie, so logging out records that session's id here and the cookie stops
 // working even if someone copied it. Rows are dropped once the cookie would have expired anyway.
 db.exec(`

@@ -100,7 +100,7 @@
             <td><strong><%= t.business_name %></strong><br><span class="small muted"><%= t.trades.split(',').map(s => tradeName[s]).join(', ') %></span></td>
             <td class="mono"><a href="https://abr.business.gov.au/ABN/View?abn=<%= t.abn %>" target="_blank" rel="noopener"><%= formatAbn(t.abn) %></a></td>
             <td class="small"><%= t.licence_no || 'No licence given' %><br><%= t.insurer %>, exp. <%= t.insurance_expiry %></td>
-            <td class="small"><%= t.name %><br><a href="mailto:<%= t.email %>"><%= t.email %></a><br><%= t.phone %></td>
+            <td class="small"><%= t.name %><br><a href="mailto:<%= t.email %>"><%= t.email %></a> <% if (t.email_verified_at) { %><span class="tag verified">confirmed</span><% } else { %><span class="tag pending">not confirmed</span><% } %><br><%= t.phone %></td>
             <td><span class="tag <%= t.status %>"><%= t.status %></span><% if (t.payouts_enabled) { %><br><span class="small muted">payouts on</span><% } %></td>
             <td>
               <div class="actions">

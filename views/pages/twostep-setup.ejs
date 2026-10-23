@@ -1,0 +1,77 @@
+<%- include('../partials/dash-start') %>
+<div class="dash-head"><h1>Two-step login</h1></div>
+<% const on = Boolean(me.totp_enabled_at); %>
+<div class="dash-cols">
+  <div>
+    <% if (codes) { %>
+      <section class="card">
+        <div class="card-head"><h2><%= typeof justEnabled !== 'undefined' ? 'Two-step login is on' : 'New backup codes' %></h2></div>
+        <p>Save these backup codes somewhere safe, like a password manager or printed out. Each one works once, if you ever lose your phone.</p>
+        <p class="small muted"><strong>This is the only time they're shown.</strong> Any older backup codes have stopped working.</p>
+        <ul class="backup-codes"><% codes.forEach(c => { %><li><code><%= c %></code></li><% }) %></ul>
+        <a class="btn" href="/dashboard/account">I've saved them</a>
+      </section>
+    <% } else if (setup) { %>
+      <section class="card">
+        <div class="card-head"><h2><%= on ? 'Move to a new phone' : 'Turn on two-step login' %></h2></div>
+        <% if (on) { %><p class="small muted">Your current app keeps working until you confirm the new one below.</p><% } %>
+        <ol class="setup-steps">
+          <li>Install an authenticator app if you don't have one: Google Authenticator, Microsoft Authenticator or Authy (free), or the one built into your password manager.</li>
+          <li>In the app, add an account and scan this code.
+            <div class="qr-box"><img src="<%= setup.qr %>" width="220" height="220" alt="QR code to scan with your authenticator app"></div>
+            <span class="small muted">Can't scan? Choose "enter a setup key" in the app and type: <code><%= setup.key %></code></span>
+          </li>
+          <li>Enter the 6-digit code the app now shows.</li>
+        </ol>
+        <form method="post" action="/dashboard/account/two-step/enable">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <div class="field"><label for="code">Code from your app</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required autofocus></div>
+          <button class="btn accent"><%= on ? 'Switch to this phone' : 'Turn on' %></button>
+        </form>
+      </section>
+    <% } else { %>
+      <section class="card">
+        <div class="card-head"><h2>Two-step login is on</h2></div>
+        <p>Logging in needs your password and a code from your authenticator app.</p>
+        <p class="small muted"><%= backupCodesLeft %> backup code<%= backupCodesLeft === 1 ? '' : 's' %> left.</p>
+      </section>
+    <% } %>
+  </div>
+  <% if (on && !codes) { %>
+    <div>
+      <section class="card">
+        <div class="card-head"><h2>Backup codes</h2></div>
+        <p class="small muted">Make a fresh set of 10. The old ones stop working.</p>
+        <form method="post" action="/dashboard/account/two-step/backup-codes">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <div class="field"><label for="bc-code">Code from your app</label><input id="bc-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required></div>
+          <button class="btn ghost small">Make new backup codes</button>
+        </form>
+      </section>
+      <% if (!setup) { %>
+        <section class="card">
+          <div class="card-head"><h2>New phone</h2></div>
+          <form method="post" action="/dashboard/account/two-step/reset">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <div class="field"><label for="np-code">Code from your current app, or a backup code</label><input id="np-code" name="code" maxlength="20" required></div>
+            <button class="btn ghost small">Set up a new phone</button>
+          </form>
+        </section>
+      <% } %>
+      <% if (!twoStepRequired) { %>
+        <section class="card">
+          <div class="card-head"><h2>Turn off</h2></div>
+          <form method="post" action="/dashboard/account/two-step/disable" data-confirm="Turn off two-step login? Your account will only need a password.">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <div class="field"><label for="off-password">Password</label><input id="off-password" name="password" type="password" autocomplete="current-password" required></div>
+            <div class="field"><label for="off-code">Code from your app</label><input id="off-code" name="code" maxlength="20" required></div>
+            <button class="btn ghost small">Turn off two-step login</button>
+          </form>
+        </section>
+      <% } else { %>
+        <p class="small muted">Admin accounts must keep two-step login on.</p>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+<%- include('../partials/dash-end') %>

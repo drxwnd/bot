@@ -244,6 +244,17 @@ const T = {
       button: { label: 'Accept the invite', href: link },
     }),
 
+  verifyEmail: (user, link) =>
+    layout({
+      subject: `Confirm your email for ${config.siteName}`,
+      heading: 'Confirm your email',
+      lines: [
+        `Hi ${user.name || 'there'}, tap the button to confirm this is your email. It gets your account its Verified badge, which ${user.role === 'tradie' ? 'customers look for when choosing who to hire, and we need it before we can approve you' : 'tradies look for when deciding which jobs to quote'}.`,
+        "The link works for three days. If you didn't sign up, ignore this email.",
+      ],
+      button: { label: 'Confirm my email', href: link },
+    }),
+
   passwordReset: (user, link) =>
     layout({
       subject: `Reset your ${config.siteName} password`,

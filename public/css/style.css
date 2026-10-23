@@ -564,7 +564,8 @@ input[type='file'] {
 .tag.completed,
 .tag.approved,
 .tag.accepted,
-.tag.released {
+.tag.released,
+.tag.verified {
   border-color: #a9c9b0;
   background: var(--ok-bg);
   color: var(--ok);
@@ -3860,4 +3861,43 @@ aside .row {
 
 .photo-grid.public {
   margin: 12px 0 8px;
+}
+
+/* Two-step login set-up */
+.setup-steps {
+  margin: 0 0 20px;
+  padding-left: 1.3em;
+  display: grid;
+  gap: 14px;
+}
+
+.qr-box {
+  margin: 12px 0 8px;
+  padding: 12px;
+  width: max-content;
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid var(--rule-2);
+  border-radius: 4px;
+}
+
+.qr-box img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.backup-codes {
+  list-style: none;
+  margin: 16px 0 20px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: 8px 28px;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+}
+
+.verify-nudge {
+  margin-bottom: 20px;
 }

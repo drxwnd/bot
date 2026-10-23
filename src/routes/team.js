@@ -11,6 +11,7 @@ const { TEAM_ROLES, ROLE_NAMES } = require('../permissions');
 const { flash, requireCan, logIn, logOutEverywhere } = require('../middleware');
 const { limit } = require('../ratelimit');
 const notify = require('../notify');
+const verification = require('../verification');
 const { oneLine } = require('../helpers');
 
 // Each invite is an email from us to an address someone typed in, so an account can only send so many a day.
@@ -183,6 +184,8 @@ router.post('/invite/:token', limit('invite', 20, 60 * 60 * 1000), loadInvite, a
     return id;
   })();
 
+  // The invite link was emailed to this address, so opening it proves they get mail there.
+  verification.markVerified(userId, invite.email);
   logIn(req, userId);
   flash(req, 'success', `Welcome to ${businessName(owner)}.`);
   res.redirect(owner.role === 'admin' ? '/admin' : owner.role === 'tradie' && invite.role === 'worker' ? '/work' : '/dashboard');

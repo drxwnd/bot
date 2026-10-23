@@ -26,7 +26,7 @@ const ago = (days, hours = 0) => `datetime('now', '-${days} days', '-${hours} ho
 
 function user(email, name, phone, role, company = null) {
   return Number(
-    db.prepare('INSERT INTO users (email, password_hash, name, phone, role, company, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\', \'-120 days\'))')
+    db.prepare('INSERT INTO users (email, password_hash, name, phone, role, company, created_at, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\', \'-120 days\'), datetime(\'now\', \'-120 days\'))')
       .run(email, hash, name, phone, role, company).lastInsertRowid,
   );
 }

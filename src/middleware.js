@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const { can, ROLE_NAMES } = require('./permissions');
 
-const getUser = db.prepare("SELECT id, email, name, phone, role, company, admin_level, session_key, password_hash = '!' AS disabled FROM users WHERE id = ?");
+const getUser = db.prepare("SELECT id, email, name, phone, role, company, admin_level, session_key, email_verified_at, totp_enabled_at, password_hash = '!' AS disabled FROM users WHERE id = ?");
 const getProfile = db.prepare('SELECT * FROM tradie_profiles WHERE user_id = ?');
 const getMembership = db.prepare("SELECT * FROM team_members WHERE user_id = ? AND status = 'active'");
 

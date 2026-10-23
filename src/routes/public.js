@@ -90,7 +90,7 @@ router.get('/privacy', (req, res) =>
 );
 
 const tradieById = db.prepare(`
-  SELECT u.id, u.name, u.created_at, p.*
+  SELECT u.id, u.name, u.created_at, u.email_verified_at, p.*
   FROM users u JOIN tradie_profiles p ON p.user_id = u.id
   WHERE u.id = ? AND p.status = 'approved'`);
 const reviewsFor = db.prepare(`

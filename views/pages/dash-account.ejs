@@ -17,6 +17,34 @@
   </section>
   <div>
     <section class="card">
+      <div class="card-head"><h2>Verified status</h2></div>
+      <% if (me.email_verified_at) { %>
+        <p><span class="tag verified">Email confirmed</span></p>
+        <% if (me.role === 'tradie' && !(user.profile && user.profile.status === 'approved')) { %>
+          <p class="small muted">Your Verified badge appears once we've checked and approved your business.</p>
+        <% } else { %>
+          <p class="small muted">Your account shows the Verified badge.</p>
+        <% } %>
+      <% } else { %>
+        <p><span class="tag pending">Email not confirmed</span></p>
+        <p class="small muted">We sent a link to <strong><%= me.email %></strong>. Confirming it gets your account its Verified badge<%= me.role === 'tradie' ? ", and we need it before we can approve you" : '' %>.</p>
+        <form method="post" action="/dashboard/account/verify-email">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn small">Send the link again</button>
+        </form>
+      <% } %>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Two-step login</h2></div>
+      <% if (me.totp_enabled_at) { %>
+        <p><span class="tag verified">On</span> <span class="small muted"><%= backupCodesLeft %> backup code<%= backupCodesLeft === 1 ? '' : 's' %> left</span></p>
+        <a class="btn ghost small" href="/dashboard/account/two-step">Manage</a>
+      <% } else { %>
+        <p class="small muted">Ask for a code from your phone as well as your password, so a stolen password alone can't get in.<%= twoStepRequired ? ' Admin accounts need this.' : '' %></p>
+        <a class="btn small" href="/dashboard/account/two-step">Turn on</a>
+      <% } %>
+    </section>
+    <section class="card">
       <div class="card-head"><h2>Change password</h2></div>
       <form method="post" action="/dashboard/account/password">
         <input type="hidden" name="_csrf" value="<%= csrf %>">

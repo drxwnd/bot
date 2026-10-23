@@ -70,6 +70,16 @@ async function signup(b, as, name, email, extra = {}) {
   await b.get('/signup' + (as === 'tradie' ? '?as=tradie' : ''));
   const res = await b.post('/signup', { as, name, email, phone: '0400 123 456', password: 'longpassword', ...extra });
   assert.strictEqual(res.status, 302);
+  await confirmEmail(b, email);
+}
+
+// Opens the verification link we emailed, the way a person would.
+async function confirmEmail(b, email) {
+  const mailer = require('../src/mailer');
+  await mailer.flush();
+  const msg = [...mailer.outbox].reverse().find((m) => m.to === email && m.kind === 'verify_email');
+  assert.ok(msg, `verification email to ${email}`);
+  await b.get(new URL(msg.text.match(/https?:\/\/\S+\/verify-email\/[\w-]+/)[0]).pathname);
 }
 
 async function invite(owner, name, email, role) {

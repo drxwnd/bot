@@ -11,10 +11,17 @@ const { feeFor, money, feeLabel, lastMonths } = require('../helpers');
 
 const router = express.Router();
 router.use(requireRole('admin'));
+// The admin account can move money and approve tradies, so a stolen password alone mustn't open it.
+router.use((req, res, next) => {
+  if (!config.requireAdminTwoStep || req.user.totp_enabled_at) return next();
+  flash(req, 'info', 'Admin pages need two-step login. Set it up below, then head back to Admin.');
+  res.redirect('/dashboard/account/two-step');
+});
 
 const q = {
+  emailVerified: db.prepare('SELECT 1 FROM users WHERE id = ? AND email_verified_at IS NOT NULL'),
   tradies: db.prepare(`
-    SELECT u.id, u.name, u.email, u.phone, u.created_at, p.*
+    SELECT u.id, u.name, u.email, u.phone, u.created_at, u.email_verified_at, p.*
     FROM tradie_profiles p JOIN users u ON u.id = p.user_id
     ORDER BY p.status = 'pending' DESC, u.created_at DESC`),
   jobs: db.prepare(`
@@ -156,6 +163,11 @@ router.post('/tradies/:id/:action', (req, res, next) => {
   if (!['approve', 'reject'].includes(req.params.action)) return next();
   const status = req.params.action === 'approve' ? 'approved' : 'rejected';
   const id = Number(req.params.id);
+  // Approval is what makes a tradie Verified, and that needs an email they've proved is theirs.
+  if (status === 'approved' && !q.emailVerified.get(id)) {
+    flash(req, 'error', "This tradie hasn't confirmed their email yet, so they can't be approved. They can send a new link from their Account page.");
+    return res.redirect('/admin#tradies');
+  }
   if (q.setStatus.run(status, status, id).changes) {
     notify.tradieReviewed(id, status);
     // Their public profile appears (approved) or goes away (rejected).

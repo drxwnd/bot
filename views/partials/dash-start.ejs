@@ -36,3 +36,4 @@
     <% if (user.role === 'tradie' && user.profile && user.profile.status === 'approved') { %><a class="dash-public" href="/tradies/<%= account.ownerId %>">View your public profile</a><% } %>
   </aside>
   <div class="dash-main">
+    <% if (!user.email_verified_at && here !== "account") { %><div class="notice info verify-nudge">Confirm your email to get your account its <strong>Verified</strong> badge. Check your inbox for our link, or <a href="/dashboard/account">send it again</a>.</div><% } %>

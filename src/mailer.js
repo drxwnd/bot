@@ -72,7 +72,7 @@ async function deliver(message) {
 function send(message) {
   if (!message || !message.to) return Promise.resolve();
   // Reset and invite links are live passwords, so they're blanked out in the log.
-  const logged = message.text.replace(/\/(reset|invite)\/[A-Za-z0-9_-]+/g, '/$1/[link removed]');
+  const logged = message.text.replace(/\/(reset|invite|verify-email)\/[A-Za-z0-9_-]+/g, '/$1/[link removed]');
   const id = q.insert.run(message.to, message.kind, message.subject, logged).lastInsertRowid;
   if (!config.isProd) {
     outbox.push(message);
