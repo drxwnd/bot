@@ -13,6 +13,7 @@ process.env.ADMIN_EMAIL = 'boss@test.local';
 
 const app = require('../server');
 const db = require('../src/db');
+const { quoteVersion } = require('../src/helpers');
 const mailer = require('../src/mailer');
 
 let server;
@@ -183,13 +184,13 @@ test('customer posts, tradie quotes, customer pays and releases', async () => {
   const stranger = browser();
   await signup(stranger, 'customer', 'Sam Stranger', 'sam@test.local');
   await stranger.get('/jobs');
-  await stranger.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents) });
+  await stranger.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(quote.id)) });
   assert.strictEqual(db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId).status, 'open');
 
   // Customer accepts. Contact details stay hidden on both sides until the job is paid.
   res = await customer.get(jobUrl);
   assert.match(res.text, /Terry Tiles/);
-  await customer.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents) });
+  await customer.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(quote.id)) });
   res = await customer.get(jobUrl);
   assert.doesNotMatch(res.text, /terry@test\.local/);
   res = await tradie.get(jobUrl);

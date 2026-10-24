@@ -13,7 +13,7 @@ const db = require('./db');
 const { feeFor, customerFeeFor } = require('./helpers');
 const notify = require('./notify');
 
-const stripe = config.paymentsEnabled ? require('stripe')(config.stripeSecretKey) : null;
+let stripe = config.paymentsEnabled ? require('stripe')(config.stripeSecretKey) : null;
 const simulated = !stripe && !config.isProd;
 
 const q = {
@@ -28,9 +28,16 @@ const q = {
       stripe_payment_intent = ?, stripe_charge_id = ?
     WHERE id = ? AND status = 'pending'`),
   markReleased: db.prepare(`
-    UPDATE payments SET status = 'released', released_at = datetime('now'), transfer_id = ?
+    UPDATE payments SET status = 'released', released_at = datetime('now'), transfer_id = ?, pending_action = NULL, pending_action_at = NULL
     WHERE id = ? AND status = 'held'`),
-  markRefunded: db.prepare(`UPDATE payments SET status = 'refunded', refunded_cents = ? WHERE id = ? AND status = 'held'`),
+  markRefunded: db.prepare(`
+    UPDATE payments SET status = 'refunded', refunded_cents = ?, pending_action = NULL, pending_action_at = NULL
+    WHERE id = ? AND status = 'held'`),
+  startAction: db.prepare(`
+    UPDATE payments SET pending_action = ?, pending_action_at = datetime('now') WHERE id = ? AND status = 'held'`),
+  clearAction: db.prepare('UPDATE payments SET pending_action = NULL, pending_action_at = NULL WHERE id = ?'),
+  // Started long enough ago that Stripe would show it by now if it had gone through.
+  actionIsOld: db.prepare("SELECT 1 FROM payments WHERE id = ? AND pending_action_at < datetime('now', '-2 minutes')"),
   jobPaid: db.prepare(`UPDATE jobs SET status = 'paid' WHERE id = ? AND status = 'awarded'`),
   jobCompleted: db.prepare(`UPDATE jobs SET status = 'completed' WHERE id = ? AND status = 'paid'`),
   jobCancelled: db.prepare(`UPDATE jobs SET status = 'cancelled' WHERE id = ?`),
@@ -116,8 +123,13 @@ async function doStartCheckout(job, quote, customer) {
     const existing = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
     if (existing.status === 'open' && existing.amount_total === payment.amount_cents + payment.customer_fee_cents) return existing.url;
     if (existing.status === 'complete') {
-      await confirmCheckoutSession(existing);
-      return `/jobs/${job.id}?paid=1`;
+      // A finished page whose payment then failed (a bank debit that bounced) doesn't count: make a
+      // new one. One still going through does, so it can't be paid twice.
+      const pi = existing.payment_status === 'paid' ? null : await stripe.paymentIntents.retrieve(existing.payment_intent);
+      if (!pi || !['requires_payment_method', 'canceled'].includes(pi.status)) {
+        await confirmCheckoutSession(existing);
+        return `/jobs/${job.id}?paid=1`;
+      }
     }
     if (existing.status === 'open') await stripe.checkout.sessions.expire(existing.id);
   }
@@ -130,6 +142,9 @@ async function doStartCheckout(job, quote, customer) {
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
+    // Cards only. Bank debits take days to clear and can fail after the page is finished, which the
+    // site (and the "pay by card" wording) doesn't allow for.
+    payment_method_types: ['card'],
     customer_email: customer.email,
     line_items: [
       {
@@ -248,6 +263,60 @@ async function refund(payment, { full = false } = {}) {
   return exclusive(payment.id, () => doRefund(q.paymentById.get(payment.id), full));
 }
 
+// A release or refund is written down before it's sent to Stripe. If Stripe's answer never arrives
+// (a timeout, a dropped connection) the money may or may not have moved, so the next release or
+// refund of that payment first asks Stripe what happened, instead of doing the opposite on top.
+async function transferFor(payment) {
+  const list = await stripe.transfers.list({ transfer_group: `job_${payment.job_id}`, limit: 20 });
+  return list.data.find((t) => t.metadata?.payment_id === String(payment.id) && !t.reversed) || null;
+}
+
+async function refundedSoFar(payment) {
+  const list = await stripe.refunds.list({ payment_intent: payment.stripe_payment_intent, limit: 20 });
+  return list.data.filter((r) => r.status === 'succeeded' || r.status === 'pending').reduce((sum, r) => sum + r.amount, 0);
+}
+
+function finishRelease(payment, transferId) {
+  if (q.markReleased.run(transferId, payment.id).changes) {
+    q.jobCompleted.run(payment.job_id);
+    notify.paymentReleased(payment.job_id);
+  }
+}
+
+function finishRefund(payment, amount) {
+  if (q.markRefunded.run(amount, payment.id).changes) {
+    q.jobCancelled.run(payment.job_id);
+    notify.refunded(payment.job_id);
+  }
+}
+
+// The other action was started and not confirmed. Returns once it's known not to have happened;
+// throws if it did happen (after recording it) or if it's too soon to tell.
+async function checkOtherAction(payment, wanted) {
+  if (!stripe || !payment.pending_action || payment.pending_action === wanted) return;
+  if (payment.pending_action === 'release') {
+    const transfer = await transferFor(payment);
+    if (transfer) {
+      finishRelease(payment, transfer.id);
+      throw new Error('This payment has already been paid out to the tradie, so it can no longer be refunded here.');
+    }
+  } else {
+    const back = await refundedSoFar(payment);
+    if (back >= payment.amount_cents) {
+      finishRefund(payment, back);
+      throw new Error('This payment has already been refunded, so it can no longer be released.');
+    }
+  }
+  if (!q.actionIsOld.get(payment.id)) {
+    throw new Error(`A ${payment.pending_action} of this payment was started a moment ago and Stripe hasn't confirmed it yet. Try again in a few minutes.`);
+  }
+  q.clearAction.run(payment.id);
+}
+
+function failedAtStripe(payment, action, err) {
+  notify.adminAlert(`The ${action} of payment ${payment.id} (job ${payment.job_id}) got an error from Stripe: ${err.message}. It may or may not have gone through. It's blocked from the opposite action until Stripe is checked; trying the ${action} again is safe.`);
+}
+
 async function doRelease(payment, tradieProfile) {
   if (payment.status !== 'held') throw new Error('Nothing to release');
   if (payment.disputed) throw new Error('This payment is under a card dispute and cannot be released until that is resolved');
@@ -255,11 +324,18 @@ async function doRelease(payment, tradieProfile) {
   // come out of the platform's pocket, so it waits for an admin to sort it out.
   if (payment.refunded_cents > 0) throw new Error('Part of this payment was refunded in Stripe, so it cannot be released. An admin needs to sort it out with the customer and tradie.');
   const payout = payment.amount_cents - payment.fee_cents;
-  let transferId = 'tr_simulated';
 
-  if (stripe) {
-    if (!tradieProfile.stripe_account_id) throw new Error('The tradie has not set up payouts yet');
-    const transfer = await stripe.transfers.create(
+  if (!stripe) return finishRelease(payment, 'tr_simulated');
+  if (!tradieProfile.stripe_account_id) throw new Error('The tradie has not set up payouts yet');
+  await checkOtherAction(payment, 'release');
+  // A retry after an unconfirmed release: it may have gone through after all.
+  const earlier = payment.pending_action === 'release' && (await transferFor(payment));
+  if (earlier) return finishRelease(payment, earlier.id);
+
+  q.startAction.run('release', payment.id);
+  let transfer;
+  try {
+    transfer = await stripe.transfers.create(
       {
         amount: payout,
         currency: 'aud',
@@ -270,30 +346,34 @@ async function doRelease(payment, tradieProfile) {
       },
       { idempotencyKey: `release-${payment.id}` },
     );
-    transferId = transfer.id;
+  } catch (err) {
+    failedAtStripe(payment, 'release', err);
+    throw err;
   }
-
-  if (q.markReleased.run(transferId, payment.id).changes) {
-    q.jobCompleted.run(payment.job_id);
-    notify.paymentReleased(payment.job_id);
-  }
+  finishRelease(payment, transfer.id);
 }
 
 async function doRefund(payment, full = false) {
   if (payment.status !== 'held') throw new Error('Only held payments can be refunded');
   const amount = payment.amount_cents + (full ? payment.customer_fee_cents : 0);
-  // After a part refund in Stripe, only the rest of the quote amount is still to go back.
-  const remaining = amount - (payment.refunded_cents || 0);
-  if (stripe && remaining > 0) {
-    await stripe.refunds.create(
-      { payment_intent: payment.stripe_payment_intent, amount: remaining },
-      { idempotencyKey: `refund-${payment.id}` },
-    );
+  if (!stripe) return finishRefund(payment, amount);
+  await checkOtherAction(payment, 'refund');
+  // After a part refund in Stripe, or a retry after an unconfirmed one, only the rest is still to go back.
+  const already = payment.pending_action === 'refund' ? await refundedSoFar(payment) : payment.refunded_cents || 0;
+  const remaining = amount - already;
+  if (remaining > 0) {
+    q.startAction.run('refund', payment.id);
+    try {
+      await stripe.refunds.create(
+        { payment_intent: payment.stripe_payment_intent, amount: remaining },
+        { idempotencyKey: `refund-${payment.id}-${remaining}` },
+      );
+    } catch (err) {
+      failedAtStripe(payment, 'refund', err);
+      throw err;
+    }
   }
-  if (q.markRefunded.run(amount, payment.id).changes) {
-    q.jobCancelled.run(payment.job_id);
-    notify.refunded(payment.job_id);
-  }
+  finishRefund(payment, amount);
 }
 
 // ---- Things that happen in Stripe rather than on our site ----
@@ -327,10 +407,7 @@ function refundedInStripe(charge) {
   if (!payment || payment.status !== 'held') return;
   const back = charge.amount_refunded || 0;
   if (back >= payment.amount_cents) {
-    if (q.markRefunded.run(back, payment.id).changes) {
-      q.jobCancelled.run(payment.job_id);
-      notify.refunded(payment.job_id);
-    }
+    finishRefund(payment, back);
   } else if (back > 0) {
     db.prepare("UPDATE payments SET refunded_cents = ? WHERE id = ? AND status = 'held'").run(back, payment.id);
     notify.adminAlert(`${back} cents of payment ${payment.id} (job ${payment.job_id}) was refunded in Stripe, but not the whole quote. It's blocked from release until you sort it out: refund the rest from /admin, or settle it with the customer and tradie in Stripe.`);
@@ -342,7 +419,13 @@ function constructWebhookEvent(rawBody, signature) {
 }
 
 module.exports = {
-  stripe,
+  get stripe() {
+    return stripe;
+  },
+  // Tests swap in a stand-in for Stripe's API.
+  useStripe(client) {
+    stripe = client;
+  },
   simulated,
   available: Boolean(stripe) || simulated,
   onboardingLink,

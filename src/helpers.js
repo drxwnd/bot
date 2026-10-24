@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const config = require('./config');
 const C = require('./constants');
 
@@ -122,6 +123,12 @@ const STATUS_LABEL = {
   cancelled: 'Cancelled',
 };
 
+// Short fingerprint of everything the customer reads in a quote, so accepting checks it's still the
+// quote they were looking at, not just the same price.
+function quoteVersion(quote) {
+  return crypto.createHash('sha256').update(JSON.stringify([quote.amount_cents, quote.message, quote.start_date])).digest('hex').slice(0, 16);
+}
+
 module.exports = {
   money,
   parseDollars,
@@ -137,5 +144,6 @@ module.exports = {
   hasContactDetails,
   oneLine,
   STATUS_LABEL,
-  locals: { money, feeFor, customerFeeFor, feeLabel, customerFeePercent: config.customerFeePercent, ago, shortDate, formatAbn, STATUS_LABEL, ...C },
+  quoteVersion,
+  locals: { quoteVersion, money, feeFor, customerFeeFor, feeLabel, customerFeePercent: config.customerFeePercent, ago, shortDate, formatAbn, STATUS_LABEL, ...C },
 };

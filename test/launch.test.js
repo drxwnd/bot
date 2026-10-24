@@ -17,6 +17,7 @@ process.env.MAX_QUOTE_DOLLARS = '20000';
 
 const app = require('../server');
 const db = require('../src/db');
+const { quoteVersion } = require('../src/helpers');
 const mailer = require('../src/mailer');
 const reminders = require('../src/reminders');
 
@@ -164,7 +165,7 @@ test('job alerts, fees, contact details and reminders', async () => {
   assert.match(page.text, /\$204\.00<small>total<\/small>/);
   assert.match(page.text, /\$200\.00 quote<\/span> <span>\+ \$4\.00 payment fee/);
   assert.ok(emailsTo('cleo@test.local', 'quote_received').some((e) => /\$204\.00/.test(e.subject) && /\$200\.00 for the job plus a \$4\.00 secure payment fee/.test(e.body_text)));
-  await customer.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents) });
+  await customer.post(`/quotes/${quote.id}/accept`, { amount_cents: String(quote.amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(quote.id)) });
   page = await customer.get(`/jobs/${jobId}`);
   assert.match(page.text, /Pay \$204\.00 to lock it in/);
   assert.doesNotMatch(page.text, /tia@test\.local/, 'no contact details before payment');

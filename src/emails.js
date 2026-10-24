@@ -269,7 +269,8 @@ const T = {
 
   teamInvite: (invite, businessName, link) =>
     layout({
-      subject: `${businessName} has added you on ${config.siteName}`,
+      // Names are typed in by whoever signs up, so they stay out of the subject line.
+      subject: `You've been invited to a team on ${config.siteName}`,
       heading: `Join ${businessName} on ${config.siteName}`,
       lines: [`Hi ${invite.name}, you've been added to the ${businessName} team. Set a password to get started.`],
       button: { label: 'Accept the invite', href: link },

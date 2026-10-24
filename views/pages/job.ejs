@@ -152,6 +152,7 @@
                 <form method="post" action="/quotes/<%= qt.id %>/accept" data-confirm="Accept this quote for <%= money(qt.amount_cents + qtFee) %><%= qtFee ? ` (${money(qt.amount_cents)} quote + ${money(qtFee)} payment fee)` : '' %>? Other quotes will be declined.">
                   <input type="hidden" name="_csrf" value="<%= csrf %>">
                   <input type="hidden" name="amount_cents" value="<%= qt.amount_cents %>">
+                  <input type="hidden" name="quote_version" value="<%= quoteVersion(qt) %>">
                   <button class="btn small">Accept quote</button>
                 </form>
               <% } else { %>

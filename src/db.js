@@ -231,6 +231,10 @@ addColumn('payments', 'customer_fee_cents', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('payments', 'disputed', 'INTEGER NOT NULL DEFAULT 0');
 // How much went back to the customer. The secure payment fee isn't refunded.
 addColumn('payments', 'refunded_cents', 'INTEGER');
+// A release or refund that was sent to Stripe but not confirmed back ('release' or 'refund'), and when.
+// While one is set, the other action is refused until Stripe has been checked.
+addColumn('payments', 'pending_action', 'TEXT');
+addColumn('payments', 'pending_action_at', 'TEXT');
 
 db.exec(`
 -- Every email we send (or would have sent, without a provider). Kept for support and debugging.

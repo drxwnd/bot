@@ -4,7 +4,7 @@
 
 const bcrypt = require('bcryptjs');
 const db = require('./db');
-const { oneLine } = require('./helpers');
+const { oneLine, hasContactDetails } = require('./helpers');
 const { logOutEverywhere } = require('./middleware');
 
 const q = {
@@ -30,6 +30,8 @@ function read(body) {
 // The first problem with a new account's details, or null if they're fine.
 function problem(values, password, role) {
   if (!values.name) return 'Enter your name.';
+  // Names go into the emails we send, so they can't carry a phone number or link.
+  if (hasContactDetails(values.name, values.company)) return 'Leave phone numbers, emails and web links out of your name and company.';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return 'Enter a valid email address.';
   if (role === 'tradie' && !/^[\d\s+()-]{8,}$/.test(values.phone)) return 'Enter a phone number customers can reach you on.';
   if (password.length < 8) return 'Use at least 8 characters for your password.';

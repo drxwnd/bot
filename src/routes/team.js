@@ -13,7 +13,7 @@ const { limit } = require('../ratelimit');
 const notify = require('../notify');
 const verification = require('../verification');
 const accounts = require('../accounts');
-const { oneLine } = require('../helpers');
+const { oneLine, hasContactDetails } = require('../helpers');
 
 // Each invite is an email from us to an address someone typed in, so an account can only send so many a day.
 const INVITES_PER_DAY = 20;
@@ -67,6 +67,9 @@ router.post('/team/invite', requireCan('team'), limit('team-invite', 30, 60 * 60
   // by the real owner) wait until the address is confirmed.
   if (!req.account.owner.email_verified_at) error = 'Confirm your email address first, using the link we emailed you. Then you can invite your team.';
   else if (!name) error = "Enter the person's name.";
+  // Both names go in the invite email we send to an address someone typed in.
+  else if (hasContactDetails(name)) error = "Take phone numbers, emails and web links out of the person's name.";
+  else if (hasContactDetails(businessName(req.account.owner))) error = 'Your name or business name has a phone number, email or web link in it. Take it out first, then invite your team.';
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = 'Enter a valid email address.';
   else if (!role) error = 'Pick a role.';
   else if (q.userByEmail.get(email)) error = 'That email already has its own Tradebench account. Use a different email for their team login.';

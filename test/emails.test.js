@@ -26,6 +26,7 @@ globalThis.fetch = async (url, opts) => {
 
 const app = require('../server');
 const db = require('../src/db');
+const { quoteVersion } = require('../src/helpers');
 const mailer = require('../src/mailer');
 const reminders = require('../src/reminders');
 
@@ -167,7 +168,7 @@ test('a changed quote says it was updated, not that it is a new one', async () =
 test('a review emails the tradie', async () => {
   const q = one('SELECT * FROM quotes WHERE job_id = ? AND tradie_id = ?', jobId, tradies.Tia.id);
   await customer.get(`/jobs/${jobId}`);
-  await customer.post(`/quotes/${q.id}/accept`, { amount_cents: String(q.amount_cents) });
+  await customer.post(`/quotes/${q.id}/accept`, { amount_cents: String(q.amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(q.id)) });
   await customer.post(`/jobs/${jobId}/pay`);
   await tradies.Tia.b.get('/dashboard/payouts');
   await tradies.Tia.b.post('/dashboard/payouts/start');
@@ -192,7 +193,7 @@ test('closing a job tells everyone who quoted, including an accepted quote not y
   const accepted = await postJob(customer, 'Fix drummy floor tiles in the hallway');
   const q = await quote(tradies.Tia, accepted, '450');
   await customer.get(`/jobs/${accepted}`);
-  await customer.post(`/quotes/${q.id}/accept`, { amount_cents: String(q.amount_cents) });
+  await customer.post(`/quotes/${q.id}/accept`, { amount_cents: String(q.amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(q.id)) });
   await customer.get(`/jobs/${accepted}`);
   await customer.post(`/jobs/${accepted}/cancel`);
   await mailer.flush();
@@ -210,7 +211,7 @@ test('reminders: unpaid accepted quotes, no quotes, unconfirmed tradie emails', 
   const unpaid = await postJob(customer, 'Seal the laundry floor tiles');
   const q = await quote(tradies.Ted, unpaid, '300');
   await customer.get(`/jobs/${unpaid}`);
-  await customer.post(`/quotes/${q.id}/accept`, { amount_cents: String(q.amount_cents) });
+  await customer.post(`/quotes/${q.id}/accept`, { amount_cents: String(q.amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(q.id)) });
   db.prepare("UPDATE jobs SET awarded_at = datetime('now', '-25 hours') WHERE id = ?").run(unpaid);
   reminders.run();
   reminders.run();

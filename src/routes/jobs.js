@@ -6,7 +6,7 @@ const C = require('../constants');
 const payments = require('../payments');
 const uploads = require('../uploads');
 const notify = require('../notify');
-const { parseDollars, money, hasContactDetails, oneLine } = require('../helpers');
+const { parseDollars, money, hasContactDetails, oneLine, quoteVersion } = require('../helpers');
 const { limit } = require('../ratelimit');
 const accounts = require('../accounts');
 const indexnow = require('../indexnow');
@@ -37,6 +37,11 @@ const NO_CONTACTS_CUSTOMER = "Take out phone numbers, emails and web links. Only
 const NO_CONTACTS_TRADIE = "Take out phone numbers, emails and web links. The customer gets your contact details as soon as they pay.";
 
 const router = express.Router();
+
+// A tradie can be hired and paid only while approved, with insurance that hasn't run out. Approval
+// can be taken away (or sent back for checking) after a quote is accepted, so pay checks it again.
+const cleared = (tp) => Boolean(tp && tp.status === 'approved' && tp.insurance_expiry && tp.insurance_expiry >= new Date().toISOString().slice(0, 10));
+const NOT_CLEARED = "That tradie can't take new jobs right now while we recheck their details. Pick another quote, or wait a day.";
 
 const q = {
   job: db.prepare(`
@@ -441,10 +446,14 @@ router.post('/quotes/:id/accept', requireLogin, (req, res, next) => {
     flash(req, 'error', `The tradie updated this quote to ${money(quote.amount_cents)}. Check the new price before accepting.`);
     return res.redirect(`/jobs/${job.id}#quotes`);
   }
+  // ...and so must what it says is included.
+  if (req.body.quote_version !== quoteVersion(quote)) {
+    flash(req, 'error', 'The tradie changed the details of this quote since you opened the page. Read it again before accepting.');
+    return res.redirect(`/jobs/${job.id}#quotes`);
+  }
   // And the tradie must still be approved, with insurance that hasn't run out.
-  const tp = q.profile.get(quote.tradie_id);
-  if (!tp || tp.status !== 'approved' || !tp.insurance_expiry || tp.insurance_expiry < new Date().toISOString().slice(0, 10)) {
-    flash(req, 'error', "That tradie can't take new jobs right now while we recheck their details. Pick another quote, or wait a day.");
+  if (!cleared(q.profile.get(quote.tradie_id))) {
+    flash(req, 'error', NOT_CLEARED);
     return res.redirect(`/jobs/${job.id}#quotes`);
   }
   db.transaction(() => {
@@ -464,8 +473,13 @@ router.post('/quotes/:id/accept', requireLogin, (req, res, next) => {
 router.post('/jobs/:id/pay', requireLogin, loadJob, ownsJob, requireJobAction('pay', MANAGER_ONLY), async (req, res, next) => {
   const job = req.job;
   if (job.status !== 'awarded') return res.redirect(`/jobs/${job.id}`);
+  const quote = q.quote.get(job.accepted_quote_id);
+  if (!cleared(q.profile.get(quote.tradie_id))) {
+    flash(req, 'error', `That tradie can't take new jobs right now while we recheck their details. Wait a day before paying, or email ${config.supportEmail} if you'd rather cancel.`);
+    return res.redirect(`/jobs/${job.id}#payment`);
+  }
   try {
-    const url = await payments.startCheckout(job, q.quote.get(job.accepted_quote_id), req.user);
+    const url = await payments.startCheckout(job, quote, req.user);
     res.redirect(303, url);
   } catch (err) {
     next(err);
@@ -497,6 +511,11 @@ router.post('/jobs/:id/release', requireLogin, loadJob, ownsJob, requireJobActio
 
   const quote = q.quote.get(job.accepted_quote_id);
   const profile = q.profile.get(quote.tradie_id);
+  // If Tradebench has turned the tradie down since the customer paid, an admin looks before any payout.
+  if (profile.status === 'rejected') {
+    flash(req, 'error', `We need to check something with this tradie before the money goes to them. It's safe with us. Email ${config.supportEmail} and we'll sort it out.`);
+    return res.redirect(`/jobs/${job.id}`);
+  }
   if (!profile.stripe_account_id || !profile.payouts_enabled) {
     flash(req, 'error', "The tradie hasn't finished setting up payouts yet. The money is safe with us. Try again once they're set up.");
     return res.redirect(`/jobs/${job.id}`);

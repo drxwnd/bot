@@ -131,6 +131,15 @@ The finding's first suggestion (rotate every member's session_key on the owner's
 
 ## Not yet reviewed (most severe first)
 
+**Review status (24 Oct 2026), money findings first.** Each was traced in the code; tests are in `test/money.test.js` and fail on the code before the fix. Not deployed yet.
+
+- **U5: real, fixed.** A release or refund is written down (`payments.pending_action`) before it goes to Stripe. If Stripe errors, the opposite action first checks Stripe (transfers by transfer group, refunds by payment intent): if the money moved it's recorded and the opposite is refused; if not, it's allowed once 2 minutes have passed. Retrying the same action is safe. The admin gets an email when this happens.
+- **U6: part real, part fixed.** Fixed: paying needs the tradie to still be approved with insurance in date, and a rejected tradie isn't paid out from the customer's Release button (admin release still works). **Open, owner to decide:** a minimum hold before release (e.g. 3 to 7 days, longer for new tradies), requiring a confirmed customer email before paying, and Stripe payout delays for new tradies. Contact details already shown to a tradie who is rejected later stay visible.
+- **U21: real (only if bank debits are switched on in Stripe), fixed.** Checkout is card only, and a finished checkout whose payment then failed gets a new one; one still going through doesn't.
+- **U22: real, not fixed: owner to decide.** A $20 quote on a $10k+ job unlocks the customer's contacts, and the fee cap of half the job overrides the advertised $15 minimum. Needs a pricing rule (minimum quote per budget band, a warning to the customer, or both).
+- **U23: real, fixed.** The accept form carries a fingerprint of the price, message and start date, and accepting is refused if any changed.
+- **U24: real, fixed.** Invites already needed a confirmed email (C5). Now the invite subject is fixed text, and names, company names and invitee names with phone numbers, emails or links are refused.
+
 ### U1. Two-step can be switched on without the password or a verified email, and a password reset can't remove it: squatted or hijacked accounts are locked to the attacker for good
 
 - **Reported severity:** high

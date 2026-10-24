@@ -14,6 +14,7 @@ process.env.ADMIN_EMAIL = 'boss@test.local';
 
 const app = require('../server');
 const db = require('../src/db');
+const { quoteVersion } = require('../src/helpers');
 
 let server;
 let base;
@@ -132,7 +133,7 @@ test('tradie business: owner, worker and job management', async () => {
   await owner.post(`/jobs/${jobId}/quotes`, { amount: '845', message: 'Regrout and replace the cracked tiles.' });
   const quoteId = id('SELECT id FROM quotes WHERE job_id = ?', jobId).id;
   await customer.get(`/jobs/${jobId}`);
-  await customer.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents) });
+  await customer.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(quoteId)) });
 
   // Not in Work until it's paid: the work order carries the customer's contact details.
   res = await owner.get('/work');
@@ -247,7 +248,7 @@ test('customer business: staff post jobs, managers accept', async () => {
   res = await staff.get(`/jobs/${jobId}`);
   assert.match(res.text, /T Co/);
   assert.match(res.text, /A manager accepts quotes/);
-  await staff.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents) });
+  await staff.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(quoteId)) });
   assert.strictEqual(id('SELECT status FROM jobs WHERE id = ?', jobId).status, 'open');
 
   // Promote to manager, then it works.
@@ -255,7 +256,7 @@ test('customer business: staff post jobs, managers accept', async () => {
   await owner.get('/team');
   await owner.post(`/team/${memberId}/role`, { role: 'manager' });
   await staff.get(`/jobs/${jobId}`);
-  await staff.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents) });
+  await staff.post(`/quotes/${quoteId}/accept`, { amount_cents: String(id('SELECT amount_cents FROM quotes WHERE id = ?', quoteId).amount_cents), quote_version: quoteVersion(db.prepare('SELECT * FROM quotes WHERE id = ?').get(quoteId)) });
   assert.strictEqual(id('SELECT status FROM jobs WHERE id = ?', jobId).status, 'awarded');
 });
 
