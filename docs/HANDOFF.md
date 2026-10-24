@@ -26,7 +26,7 @@ Tradebench is a Perth/WA marketplace for repair, maintenance and building jobs: 
    $env:DATA_DIR='demo-data'; npm run dev      # http://localhost:3000
    ```
    Locally, two-step login isn't required for admin pages (set `ADMIN_TWO_STEP=1` to try it).
-4. Tests: `npm test` (57 passing at 7279e75).
+4. Tests: `npm test` (73 passing with the email gaps and C1–C5 audit fixes).
 5. Pushing: if `git push` says "Invalid username or token", either run `gh auth setup-git` once (makes git use the GitHub CLI login), or push with
    `git -c credential.helper= -c "credential.helper=!gh auth git-credential" push origin claude/job-marketplace-platform-apy73w`.
 6. Deploying needs the Fly CLI: install it with `iwr https://fly.io/install.ps1 -useb | iex`, then `fly auth login` (the Fly account is the owner's Gmail). Deploy from the repo folder:

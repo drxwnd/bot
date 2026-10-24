@@ -148,6 +148,10 @@ if (require.main === module) {
   const server = app.listen(config.port, () => {
     console.log(`${config.siteName} running at ${config.siteUrl}`);
   });
+  // A request has 30 seconds to send its headers and 5 minutes to finish, so slow senders can't
+  // hold connections open. Uploads that stall are dropped sooner (see uploads.receive).
+  server.headersTimeout = 30_000;
+  server.requestTimeout = 5 * 60_000;
   require('./src/reminders').start();
   require('./src/backup').start();
 

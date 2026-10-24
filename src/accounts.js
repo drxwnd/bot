@@ -1,13 +1,19 @@
 // New accounts, made from the sign-up page or from a visitor posting their first job. Both use the
-// same checks so the rules can't drift apart.
+// same checks so the rules can't drift apart. Also removing team logins, which the Team page and
+// password resets both do.
 
 const bcrypt = require('bcryptjs');
 const db = require('./db');
 const { oneLine } = require('./helpers');
+const { logOutEverywhere } = require('./middleware');
 
 const q = {
   byEmail: db.prepare('SELECT id FROM users WHERE email = ?'),
   insert: db.prepare('INSERT INTO users (email, password_hash, name, phone, role, company) VALUES (?, ?, ?, ?, ?, ?)'),
+  team: db.prepare("SELECT * FROM team_members WHERE account_id = ? AND status != 'removed'"),
+  removeMember: db.prepare("UPDATE team_members SET status = 'removed', token = NULL, user_id = NULL WHERE id = ?"),
+  disableLogin: db.prepare("UPDATE users SET password_hash = '!' WHERE id = ?"),
+  unassign: db.prepare('UPDATE work_orders SET assigned_to = NULL WHERE assigned_to = ? AND account_id = ?'),
 };
 
 const TAKEN = 'There is already an account with that email. Try logging in.';
@@ -44,4 +50,27 @@ function insert(values, passwordHash, role) {
 // Two sign-ups with the same email at the same moment: the second insert hits the unique index.
 const isTaken = (err) => err && err.code === 'SQLITE_CONSTRAINT_UNIQUE' && /users\.email/.test(err.message);
 
-module.exports = { read, problem, hash, insert, isTaken, TAKEN };
+// Take someone off a team (or cancel their invite). Their login only existed for this team, so it's
+// switched off for good and any session they have open ends now. The user row stays so their notes
+// and hours stay on the jobs (and so its id can never be handed to someone else).
+function removeMember(member) {
+  db.transaction(() => {
+    q.removeMember.run(member.id);
+    if (member.user_id) {
+      q.disableLogin.run(member.user_id);
+      q.unassign.run(member.user_id, member.account_id);
+      logOutEverywhere(member.user_id);
+    }
+  })();
+}
+
+// Everyone on an account's team, and invites not yet accepted.
+const team = (ownerId) => q.team.all(ownerId);
+
+function removeTeam(ownerId) {
+  db.transaction(() => {
+    for (const m of team(ownerId)) removeMember(m);
+  })();
+}
+
+module.exports = { read, problem, hash, insert, isTaken, TAKEN, removeMember, removeTeam, team };

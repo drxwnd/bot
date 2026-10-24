@@ -20,8 +20,22 @@ async function backup({ force = false } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `tradebench-${perthDay()}.db`);
   if (!force && fs.existsSync(file)) return null;
+  // Leftovers from a backup that failed part way.
+  for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.tmp'))) fs.rmSync(path.join(dir, f), { force: true });
+  // The backups share the disk with the live database. If a copy won't fit with room to spare, skip it
+  // rather than fill the disk and stop the site saving anything.
+  const { bavail, bsize } = fs.statfsSync(dir);
+  const needed = 2 * fs.statSync(db.name).size;
+  if (bavail * bsize < needed) {
+    throw new Error(`Not enough free disk space for a backup (${Math.round((bavail * bsize) / 1e6)}MB free, ${Math.round(needed / 1e6)}MB wanted). Run fly volumes extend.`);
+  }
   // Write to a temporary name first, so a crash half way never leaves a broken file under today's name.
-  await db.backup(`${file}.tmp`);
+  try {
+    await db.backup(`${file}.tmp`);
+  } catch (err) {
+    fs.rmSync(`${file}.tmp`, { force: true });
+    throw err;
+  }
   fs.renameSync(`${file}.tmp`, file);
   const old = fs.readdirSync(dir).filter((f) => /^tradebench-\d+\.db$/.test(f)).sort().slice(0, -KEEP);
   for (const f of old) fs.rmSync(path.join(dir, f), { force: true });

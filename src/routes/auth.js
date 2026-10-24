@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
 const { flash, logIn, logOut, logOutEverywhere, safeEqual } = require('../middleware');
-const { limit } = require('../ratelimit');
+const { limit, ipKey } = require('../ratelimit');
 const notify = require('../notify');
 const { unsubscribeToken } = require('../emails');
 const accounts = require('../accounts');
@@ -15,18 +15,32 @@ const router = express.Router();
 
 const findByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
 
-// Small in-memory throttle on login attempts per IP + email.
+// Small in-memory throttle on login attempts per IP + email. Entries last 15 minutes and are swept
+// every few minutes; the map also has a hard size cap, oldest dropped first, so it can't fill memory.
+const WINDOW = 15 * 60 * 1000;
+const MAX_TRACKED = 50_000;
 const attempts = new Map();
 function throttled(key) {
   const now = Date.now();
-  const rec = attempts.get(key) || { n: 0, until: 0, first: now };
-  if (now - rec.first > 15 * 60 * 1000) Object.assign(rec, { n: 0, first: now });
-  attempts.set(key, rec);
-  if (attempts.size > 10000) {
-    for (const [k, r] of attempts) if (now - r.first > 15 * 60 * 1000) attempts.delete(k);
+  let rec = attempts.get(key);
+  if (!rec || now - rec.first > WINDOW) {
+    attempts.delete(key);
+    if (attempts.size >= MAX_TRACKED) attempts.delete(attempts.keys().next().value);
+    rec = { n: 0, first: now };
+    attempts.set(key, rec);
   }
   return rec;
 }
+const sweep = setInterval(() => {
+  const now = Date.now();
+  for (const [k, r] of attempts) if (now - r.first > WINDOW) attempts.delete(k);
+}, 5 * 60 * 1000);
+sweep.unref();
+
+// Password checks running at once. bcrypt takes the one CPU for a moment each, so a flood of logins
+// gets "busy, try again" rather than slowing the whole site down for everyone.
+const MAX_HASHING = 4;
+let hashing = 0;
 
 // Compared against when the email isn't found, so a wrong email takes as long as a wrong password
 // and the timing doesn't give away who has an account.
@@ -61,34 +75,38 @@ const loginLimit = limit('login', 40, 15 * 60 * 1000, (req, res) =>
 const signupLimit = limit('signup', 12, 60 * 60 * 1000);
 
 router.post('/login', loginLimit, async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase();
+  // Sign-up keeps emails to 200 characters, so nothing longer can match an account.
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 200);
   const password = String(req.body.password || '');
-  const rec = throttled(`${req.ip}|${email}`);
+  const ipEmail = `${ipKey(req.ip)}|${email}`;
+  const rec = throttled(ipEmail);
   const forEmail = throttled(`email|${email}`);
+  const page = (status, error) => res.status(status).render('pages/login', { title: 'Log in', next: req.body.next, email, error });
 
   if (rec.n >= 8 || forEmail.n >= EMAIL_FAILURES) {
-    return res.status(429).render('pages/login', {
-      title: 'Log in',
-      next: req.body.next,
-      email,
-      error: 'Too many attempts. Wait 15 minutes and try again, or reset your password.',
-    });
+    return page(429, 'Too many attempts. Wait 15 minutes and try again, or reset your password.');
+  }
+  if (hashing >= MAX_HASHING) {
+    res.set('Retry-After', '5');
+    return page(503, 'Lots of people are logging in right now. Wait a few seconds and try again.');
   }
 
+  // Counted as a failure before the (slow) password check, so many tries sent at once can't all slip
+  // in under the limit while the first ones are still being checked. Given back if it's right.
+  rec.n += 1;
+  forEmail.n += 1;
+  hashing += 1;
+  let ok;
   const user = findByEmail.get(email);
-  const ok = await bcrypt.compare(password.slice(0, 200), user ? user.password_hash : DUMMY_HASH);
-  if (!ok || !user) {
-    rec.n += 1;
-    forEmail.n += 1;
-    return res.status(401).render('pages/login', {
-      title: 'Log in',
-      next: req.body.next,
-      email,
-      error: "That email and password don't match.",
-    });
+  try {
+    ok = await bcrypt.compare(password.slice(0, 200), user ? user.password_hash : DUMMY_HASH);
+  } finally {
+    hashing -= 1;
   }
+  if (!ok || !user) return page(401, "That email and password don't match.");
 
-  attempts.delete(`${req.ip}|${email}`);
+  attempts.delete(ipEmail);
+  forEmail.n = Math.max(0, forEmail.n - 1);
   if (twostep.isOn(user)) return askForCode(req, res, user.id, safeNext(req.body.next));
   logIn(req, user.id);
   res.redirect(safeNext(req.body.next));
@@ -222,7 +240,7 @@ router.get('/forgot', (req, res) => {
 router.post('/forgot', limit('forgot', 10, 60 * 60 * 1000), (req, res) => {
   res.locals.robots = 'noindex, nofollow';
   const email = String(req.body.email || '').trim().toLowerCase();
-  const rec = throttled(`forgot|${req.ip}`);
+  const rec = throttled(`forgot|${ipKey(req.ip)}`);
   if (rec.n >= 5) {
     return res.status(429).render('pages/forgot', { title: 'Reset your password', email, error: 'Too many requests. Wait 15 minutes and try again.' });
   }
@@ -263,23 +281,37 @@ router.post('/reset/:token', loadReset, async (req, res) => {
     return res.status(400).render('pages/reset', { title: 'Choose a new password', token: req.params.token, error: 'Use between 8 and 200 characters.' });
   }
   const hash = await bcrypt.hash(password, 11);
+  const before = resets.user.get(req.reset.user_id);
+  const team = accounts.team(before.id);
   db.transaction(() => {
-    resets.setPassword.run(hash, req.reset.user_id);
-    resets.useAll.run(req.reset.user_id);
+    resets.setPassword.run(hash, before.id);
+    resets.useAll.run(before.id);
+    // If the email had never been confirmed, whoever set the account up may not have owned it, so
+    // any team logins they made (which have passwords of their own) are removed too.
+    if (!before.email_verified_at) accounts.removeTeam(before.id);
   })();
-  // Anyone else logged in to this account (the reason for the reset, perhaps) is logged out.
-  logOutEverywhere(req.reset.user_id);
+  // Every device logged in with this login (the reason for the reset, perhaps) is logged out. Team
+  // members have their own logins; see above and the Team page.
+  logOutEverywhere(before.id);
   // The reset link came by email, so they clearly get mail at this address.
-  const user = resets.user.get(req.reset.user_id);
-  verification.markVerified(user.id, user.email);
-  // A new password alone mustn't get past two-step login.
-  if (twostep.isOn(user)) {
-    flash(req, 'success', 'Password changed. Enter your two-step code to finish logging in.');
-    return askForCode(req, res, user.id, '/dashboard');
+  verification.markVerified(before.id, before.email);
+  let message = 'Password changed. You are logged in.';
+  let next = '/dashboard';
+  if (team.length && !before.email_verified_at) {
+    message = 'Password changed. The team logins and invites on this account were removed, because the email had not been confirmed when they were set up. Invite your team again from here.';
+    next = '/team';
+  } else if (team.length) {
+    message = "Password changed. Check your team below and remove anyone you don't recognise: they have their own logins.";
+    next = '/team';
   }
-  logIn(req, user.id);
-  flash(req, 'success', 'Password changed. You are logged in.');
-  res.redirect('/dashboard');
+  // A new password alone mustn't get past two-step login.
+  if (twostep.isOn(before)) {
+    flash(req, 'success', `${message} Enter your two-step code to finish logging in.`);
+    return askForCode(req, res, before.id, next);
+  }
+  logIn(req, before.id);
+  flash(req, 'success', message);
+  res.redirect(next);
 });
 
 // ---- Turning off job alerts and reminders (the link at the bottom of those emails) ----

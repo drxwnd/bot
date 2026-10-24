@@ -16,6 +16,7 @@ const { oneOf } = require('../constants');
 const { can } = require('../permissions');
 const { flash, verifyCsrf, requireRole, requireCan } = require('../middleware');
 const uploads = require('../uploads');
+const { hit } = require('../ratelimit');
 
 const router = express.Router();
 router.use(['/work', '/invoices'], requireRole('tradie'), requireCan('work.view'), (req, res, next) => {
@@ -35,6 +36,17 @@ const STATUS = {
   cancelled: 'Cancelled',
 };
 const ACTIVE = ['new', 'scheduled', 'in_progress'];
+
+// Limits on what one account can add. Everything shares one disk with the database and its backups,
+// so a script mustn't be able to fill it. Real businesses stay far below these.
+const PRIVATE_JOBS_PER_DAY = 50;
+// Before the business is approved, private jobs are for trying things out.
+const PRIVATE_JOBS_UNAPPROVED = 20;
+// Hours and materials lines on one job, and how many of those (plus invoices) an account can add an hour.
+const ROWS_PER_JOB = 500;
+const ROWS_PER_HOUR = 300;
+const tooFast = (req) => !hit(`work-rows|a${req.account.ownerId}`, ROWS_PER_HOUR, 60 * 60 * 1000);
+const SLOW_DOWN = "That's a lot added in a short time. Wait a while and try again.";
 
 // ---- Dates (Perth time) ----
 
@@ -133,6 +145,10 @@ const q = {
       client_email = @client_email, address = @address, description = @description, price_cents = @price_cents
     WHERE id = @id AND source = 'private'`),
   setStatus: db.prepare('UPDATE work_orders SET status = ? WHERE id = ?'),
+  privateToday: db.prepare("SELECT COUNT(*) AS n FROM work_orders WHERE account_id = ? AND source = 'private' AND created_at > datetime('now', '-1 day')"),
+  privateTotal: db.prepare("SELECT COUNT(*) AS n FROM work_orders WHERE account_id = ? AND source = 'private'"),
+  timeCount: db.prepare('SELECT COUNT(*) AS n FROM time_entries WHERE work_id = ?'),
+  costCount: db.prepare('SELECT COUNT(*) AS n FROM work_costs WHERE work_id = ?'),
   notes: db.prepare(`
     SELECT n.*, u.name AS author FROM work_notes n JOIN users u ON u.id = n.user_id WHERE n.work_id = ? ORDER BY n.created_at DESC`),
   addNote: db.prepare('INSERT INTO work_notes (work_id, user_id, body, photo) VALUES (?, ?, ?, ?)'),
@@ -284,8 +300,14 @@ router.post('/work', requireCan('work.manage'), (req, res) => {
   };
   values.status = values.scheduled_date ? 'scheduled' : 'new';
 
+  const status = req.user.profile.status;
   let error = null;
-  if (values.title.length < 3) error = 'Give the job a title.';
+  if (status === 'rejected') error = `Your business wasn't approved, so you can't add jobs. Email ${config.supportEmail} if you think that's wrong.`;
+  else if (status !== 'approved' && q.privateTotal.get(req.account.ownerId).n >= PRIVATE_JOBS_UNAPPROVED) {
+    error = `You can add up to ${PRIVATE_JOBS_UNAPPROVED} private jobs while your business is being checked. You can add more once it's approved.`;
+  } else if (q.privateToday.get(req.account.ownerId).n >= PRIVATE_JOBS_PER_DAY) {
+    error = `You've added ${PRIVATE_JOBS_PER_DAY} private jobs today, which is the daily limit. Email ${config.supportEmail} if you need more.`;
+  } else if (values.title.length < 3) error = 'Give the job a title.';
   else if (!values.client_name) error = "Enter the client's name.";
   else if (b.price && !values.price_cents) error = 'Enter the price in dollars, e.g. 1,250.';
   if (error) return res.status(400).render('pages/work-new', { title: 'New private job', values, team, error });
@@ -419,6 +441,8 @@ router.post('/work/:id/time', loadWork, (req, res) => {
   const minutes = parseHours(req.body.hours);
   const date = isDate(req.body.work_date) ? req.body.work_date : perthToday();
   if (!minutes) flash(req, 'error', 'Enter hours like 2.5 or 2:30.');
+  else if (q.timeCount.get(req.work.id).n >= ROWS_PER_JOB) flash(req, 'error', `A job can have up to ${ROWS_PER_JOB} time entries.`);
+  else if (tooFast(req)) flash(req, 'error', SLOW_DOWN);
   else q.addTime.run(req.work.id, req.user.id, date, minutes, String(req.body.note || '').trim().slice(0, 300) || null);
   res.redirect(`/work/${req.work.id}#time`);
 });
@@ -433,6 +457,8 @@ router.post('/work/:id/costs', loadWork, (req, res) => {
   const amount = parseDollars(req.body.amount);
   const description = String(req.body.description || '').trim().slice(0, 200);
   if (!description || !amount) flash(req, 'error', 'Enter what it was and how much, e.g. "Tile adhesive" and 64.50.');
+  else if (q.costCount.get(req.work.id).n >= ROWS_PER_JOB) flash(req, 'error', `A job can have up to ${ROWS_PER_JOB} materials and costs.`);
+  else if (tooFast(req)) flash(req, 'error', SLOW_DOWN);
   else q.addCost.run(req.work.id, req.user.id, description, amount);
   res.redirect(`/work/${req.work.id}#costs`);
 });
@@ -491,6 +517,10 @@ router.post('/work/:id/invoice', requireCan('money'), loadWork, (req, res) => {
 
   if (!lines.length) {
     flash(req, 'error', 'Add at least one line with a description, quantity and price.');
+    return res.redirect(`/work/${work.id}/invoice`);
+  }
+  if (tooFast(req)) {
+    flash(req, 'error', SLOW_DOWN);
     return res.redirect(`/work/${work.id}/invoice`);
   }
 

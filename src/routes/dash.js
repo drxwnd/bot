@@ -15,6 +15,7 @@ const { limit } = require('../ratelimit');
 const config = require('../config');
 const twostep = require('../twostep');
 const verification = require('../verification');
+const accounts = require('../accounts');
 
 const router = express.Router();
 
@@ -427,6 +428,10 @@ const passwordLimit = limit('password', 10, 15 * 60 * 1000, (req, res) => {
   res.redirect('/dashboard/account');
 });
 
+// Team members have their own logins, which a password change doesn't touch, so say so.
+const teamNote = (userId) =>
+  accounts.team(userId).length ? " Your team's logins are separate: check the Team page and remove anyone you don't recognise." : '';
+
 router.post('/dashboard/account/password', requireLogin, passwordLimit, async (req, res) => {
   const me = q.user.get(req.user.id);
   const current = String(req.body.current || '');
@@ -441,7 +446,7 @@ router.post('/dashboard/account/password', requireLogin, passwordLimit, async (r
     // Every other device is logged out; this one stays logged in.
     logOutEverywhere(me.id);
     logIn(req, me.id);
-    flash(req, 'success', 'Password changed. Any other devices have been logged out.');
+    flash(req, 'success', `Password changed. Any other devices have been logged out.${teamNote(me.id)}`);
   }
   res.redirect('/dashboard/account');
 });
@@ -449,7 +454,7 @@ router.post('/dashboard/account/password', requireLogin, passwordLimit, async (r
 router.post('/dashboard/account/logout-everywhere', requireLogin, (req, res) => {
   logOutEverywhere(req.user.id);
   logIn(req, req.user.id);
-  flash(req, 'success', 'Logged out of every other device.');
+  flash(req, 'success', `Logged out of every other device.${teamNote(req.user.id)}`);
   res.redirect('/dashboard/account');
 });
 

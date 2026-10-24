@@ -11,6 +11,14 @@ Line numbers are as of 7279e75 and will drift as the code changes.
 
 ## Confirmed
 
+**Status (24 Oct 2026): C1 to C5 are fixed in code, with tests in `test/audit.test.js`. Not deployed yet.**
+
+- C1: uploads stream to the machine's temp folder instead of memory; only one image is decoded at a time; each person (account, or address, with IPv6 counted per /64) can have 2 uploads open, with 20 for the whole site; an upload that sends under 32KB in 10 seconds is dropped; the server allows 30s for headers and 5 minutes per request.
+- C2: login cuts emails to 200 characters; the throttle map is swept every 5 minutes and capped at 50,000 entries.
+- C3: a login attempt is counted before the password check, and given back if it's right; at most 4 password checks run at once (others get "busy, try again"); rate limits count IPv6 per /64.
+- C4: private jobs are capped at 20 while a business is being checked, 50 a day once approved, and none if rejected; 500 time entries and 500 costs per job; 300 time/cost/invoice additions an hour per account; backups are skipped (with a logged error) when free space is under twice the database size, and leftover temp files are cleaned up.
+- C5: team invites need a confirmed email; a password reset on an account whose email wasn't confirmed removes all its team logins and invites; on a confirmed account the reset (and password change / log out everywhere) points the owner at the Team page instead of silently logging staff out.
+
 ### C1. Two slow anonymous uploads use up the global upload cap (MAX_ACTIVE=2) and block every job post and photo upload site-wide
 
 - **Severity:** high (first reported as high)

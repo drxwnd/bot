@@ -9,12 +9,13 @@
 // on that business's team.
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const sharp = require('sharp');
 const config = require('./config');
-const { hit } = require('./ratelimit');
+const { hit, ipKey } = require('./ratelimit');
 
 const privateDir = path.join(config.dataDir, 'private-uploads');
 fs.mkdirSync(config.uploadDir, { recursive: true });
@@ -25,46 +26,88 @@ const MAX_MB = 12;
 // Biggest image we'll decode, in pixels. A 48 megapixel phone photo fits; a small file that claims to be
 // a huge image (which would need gigabytes of memory to open) is refused before it's decoded.
 const MAX_PIXELS = 60_000_000;
-// Uploads held in memory at once. The server has 512MB and each request can carry up to 8 photos of
-// 12MB, so two at a time keeps the worst case under 200MB.
-const MAX_ACTIVE = 2;
-let active = 0;
-// Upload requests one account (or, logged out, one address) can make in 10 minutes, so a single
-// person can't keep every upload slot busy.
+// Incoming files are written to the machine's own temp folder (not the /data volume, and not memory)
+// while they arrive, so a slow upload costs a connection, not memory. Decoding is what needs the
+// memory (about 135MB for a big photo), so only one image is decoded at a time; see oneAtATime.
+const incomingDir = path.join(os.tmpdir(), 'tradebench-incoming');
+fs.mkdirSync(incomingDir, { recursive: true });
+// Upload requests being received at once: per person, and for the whole site as a backstop.
+const PER_PERSON_ACTIVE = 2;
+const MAX_ACTIVE = 20;
+const active = new Map();
+let activeTotal = 0;
+// Upload requests one account (or, logged out, one address) can make in 10 minutes.
 const PER_PERSON = 20;
+// An upload that sends less than this in any 10 seconds is dropped, so someone trickling a byte at a
+// time can't hold a connection for minutes. 32KB per 10s is far slower than any phone connection.
+const STALL_CHECK_MS = Number(process.env.UPLOAD_STALL_MS) || 10_000;
+const STALL_MIN_BYTES = 32 * 1024;
 
 // One image at a time, and nothing kept in sharp's cache between them, to keep memory steady.
 sharp.concurrency(1);
 sharp.cache(false);
 
-// Files are held in memory until the route has checked the CSRF token and permissions, so a
-// rejected request never leaves anything on disk.
+let decoding = Promise.resolve();
+function oneAtATime(fn) {
+  const run = decoding.then(() => fn());
+  decoding = run.catch(() => {});
+  return run;
+}
+
+// Files wait in the temp folder until the route has checked the CSRF token and permissions, and are
+// deleted when the response ends, so a rejected request never leaves anything behind.
 function receive(field, maxFiles) {
   const m = multer({
-    storage: multer.memoryStorage(),
+    storage: multer.diskStorage({
+      destination: incomingDir,
+      filename: (req, file, cb) => {
+        const name = crypto.randomBytes(12).toString('hex');
+        req.incoming.push(path.join(incomingDir, name));
+        cb(null, name);
+      },
+    }),
     // The text fields on these forms are short, so cap how many there are and how big.
     limits: { fileSize: MAX_MB * 1024 * 1024, files: maxFiles, fields: 40, fieldSize: 64 * 1024, parts: maxFiles + 40 },
     fileFilter: (req, file, cb) => cb(null, TYPES.has(file.mimetype)),
   });
   const handler = maxFiles === 1 ? m.single(field) : m.array(field, maxFiles);
   return (req, res, next) => {
-    if (!hit(`upload|${req.user ? `u${req.user.id}` : req.ip}`, PER_PERSON, 10 * 60 * 1000)) {
+    const who = req.user ? `u${req.user.id}` : ipKey(req.ip);
+    if (!hit(`upload|${who}`, PER_PERSON, 10 * 60 * 1000)) {
       return res.status(429).render('pages/error', { title: 'Slow down', message: "That's a lot of uploads in a short time. Wait a few minutes, then try again." });
     }
-    if (active >= MAX_ACTIVE) {
+    if (activeTotal >= MAX_ACTIVE || (active.get(who) || 0) >= PER_PERSON_ACTIVE) {
       res.set('Retry-After', '10');
       return res.status(503).render('pages/error', { title: 'Busy right now', message: 'A lot of photos are being uploaded at the moment. Wait a few seconds, then go back and try again.' });
     }
-    active += 1;
+    activeTotal += 1;
+    active.set(who, (active.get(who) || 0) + 1);
+    req.incoming = [];
+
+    let lastBytes = req.socket ? req.socket.bytesRead : 0;
+    const stall = setInterval(() => {
+      const now = req.socket ? req.socket.bytesRead : lastBytes;
+      if (now - lastBytes < STALL_MIN_BYTES) req.destroy();
+      lastBytes = now;
+    }, STALL_CHECK_MS);
+    stall.unref();
+
     let done = false;
     const finish = () => {
+      clearInterval(stall);
       if (done) return;
       done = true;
-      active -= 1;
+      activeTotal -= 1;
+      const n = active.get(who) - 1;
+      if (n) active.set(who, n);
+      else active.delete(who);
+      for (const f of req.incoming) fs.rm(f, { force: true }, () => {});
     };
     res.once('finish', finish);
     res.once('close', finish);
     handler(req, res, (err) => {
+      // The whole body is in; from here it's our own work, which the stall check mustn't cut short.
+      clearInterval(stall);
       if (!err) return next();
       req.uploadError =
         err.code === 'LIMIT_FILE_SIZE'
@@ -92,17 +135,31 @@ function isPhoto(buf) {
   return buf.toString('latin1', 4, 8) === 'ftyp' && HEIF_BRANDS.has(buf.toString('latin1', 8, 12));
 }
 
+// The first bytes of an uploaded file, whether it's in memory or in the temp folder.
+function head(file) {
+  if (file.buffer) return file.buffer;
+  const buf = Buffer.alloc(12);
+  const fd = fs.openSync(file.path, 'r');
+  try {
+    return buf.subarray(0, fs.readSync(fd, buf, 0, 12, 0));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 // Re-encode and save one image. Returns the file name (the thumbnail is name-sm.jpg).
-async function save(file, { isPrivate = false, maxSide = 1800 } = {}) {
-  if (!isPhoto(file.buffer)) throw new Error('Not a photo');
-  const dir = isPrivate ? privateDir : config.uploadDir;
-  const name = crypto.randomBytes(12).toString('hex');
-  const img = sharp(file.buffer, { failOn: 'error', limitInputPixels: MAX_PIXELS }).rotate();
-  await img.clone().resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 80, mozjpeg: true }).toFile(path.join(dir, `${name}.jpg`));
-  await img.clone().resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 72, mozjpeg: true }).toFile(path.join(dir, `${name}-sm.jpg`));
-  return `${name}.jpg`;
+function save(file, { isPrivate = false, maxSide = 1800 } = {}) {
+  return oneAtATime(async () => {
+    if (!isPhoto(head(file))) throw new Error('Not a photo');
+    const dir = isPrivate ? privateDir : config.uploadDir;
+    const name = crypto.randomBytes(12).toString('hex');
+    const img = sharp(file.buffer || file.path, { failOn: 'error', limitInputPixels: MAX_PIXELS }).rotate();
+    await img.clone().resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80, mozjpeg: true }).toFile(path.join(dir, `${name}.jpg`));
+    await img.clone().resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 72, mozjpeg: true }).toFile(path.join(dir, `${name}-sm.jpg`));
+    return `${name}.jpg`;
+  });
 }
 
 // Save several; anything that isn't a readable image is skipped and counted.

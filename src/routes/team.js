@@ -8,10 +8,11 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
 const { TEAM_ROLES, ROLE_NAMES } = require('../permissions');
-const { flash, requireCan, logIn, logOutEverywhere } = require('../middleware');
+const { flash, requireCan, logIn } = require('../middleware');
 const { limit } = require('../ratelimit');
 const notify = require('../notify');
 const verification = require('../verification');
+const accounts = require('../accounts');
 const { oneLine } = require('../helpers');
 
 // Each invite is an email from us to an address someone typed in, so an account can only send so many a day.
@@ -30,7 +31,6 @@ const q = {
   invitedToday: db.prepare("SELECT COUNT(*) AS n FROM team_members WHERE account_id = ? AND created_at > datetime('now', '-1 day')"),
   insert: db.prepare('INSERT INTO team_members (account_id, email, name, role, token) VALUES (?, ?, ?, ?, ?)'),
   setRole: db.prepare('UPDATE team_members SET role = ? WHERE id = ?'),
-  remove: db.prepare("UPDATE team_members SET status = 'removed', token = NULL, user_id = NULL WHERE id = ?"),
   activate: db.prepare("UPDATE team_members SET status = 'active', token = NULL, user_id = ?, name = ? WHERE id = ?"),
   userByEmail: db.prepare('SELECT id FROM users WHERE email = ?'),
   user: db.prepare('SELECT * FROM users WHERE id = ?'),
@@ -63,7 +63,10 @@ router.post('/team/invite', requireCan('team'), limit('team-invite', 30, 60 * 60
   const role = TEAM_ROLES[kind].find((r) => r.slug === req.body.role) ? req.body.role : null;
 
   let error = null;
-  if (!name) error = "Enter the person's name.";
+  // Anyone can sign up with an email they don't own, so team logins (which outlast a password reset
+  // by the real owner) wait until the address is confirmed.
+  if (!req.account.owner.email_verified_at) error = 'Confirm your email address first, using the link we emailed you. Then you can invite your team.';
+  else if (!name) error = "Enter the person's name.";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = 'Enter a valid email address.';
   else if (!role) error = 'Pick a role.';
   else if (q.userByEmail.get(email)) error = 'That email already has its own Tradebench account. Use a different email for their team login.';
@@ -95,17 +98,7 @@ router.post('/team/:id/role', requireCan('team'), (req, res) => {
 router.post('/team/:id/remove', requireCan('team'), (req, res) => {
   const member = q.member.get(Number(req.params.id), req.account.ownerId);
   if (member) {
-    db.transaction(() => {
-      q.remove.run(member.id);
-      // Their login only existed for this team, so it's switched off for good and any session they
-      // have open ends now. The user row stays so their notes and hours stay on the jobs (and so its
-      // id can never be handed to someone else).
-      if (member.user_id) {
-        db.prepare("UPDATE users SET password_hash = '!' WHERE id = ?").run(member.user_id);
-        db.prepare('UPDATE work_orders SET assigned_to = NULL WHERE assigned_to = ? AND account_id = ?').run(member.user_id, req.account.ownerId);
-        logOutEverywhere(member.user_id);
-      }
-    })();
+    accounts.removeMember(member);
     flash(req, 'success', `${member.name} has been removed and can no longer log in.`);
   }
   res.redirect('/team');
