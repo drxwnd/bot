@@ -25,6 +25,8 @@ const q = {
       AND (',' || p.sectors || ',') LIKE ('%,' || @sector || ',%')
     LIMIT 300`),
   admins: db.prepare("SELECT * FROM users WHERE role = 'admin' AND (admin_level IS NULL OR admin_level = 'owner')"),
+  setAlerted: db.prepare('UPDATE jobs SET alerted = ? WHERE id = ?'),
+  review: db.prepare('SELECT * FROM reviews WHERE id = ?'),
 };
 
 const send = (to, kind, msg) => mailer.send({ to: to.email || to, kind, ...msg });
@@ -41,23 +43,50 @@ function businessOf(tradieId) {
 }
 
 // A job that's "something else" goes to handymen, who take on a bit of everything.
-function jobPosted(jobId) {
+// Emails the matching tradies, then tells the admin how many it reached, so a job nobody will see
+// gets a phone call the same day. `newAccount` when the customer signed up with this job.
+function jobPosted(jobId, { newAccount = false } = {}) {
   const job = q.job.get(jobId);
   if (!job) return;
   const trade = job.trade === 'other' ? 'handyman' : job.trade;
-  const tradies = q.matching.all({ trade, region: job.region, sector: job.sector });
-  for (const t of tradies) {
-    if (t.id === job.customer_id) continue;
-    send(t, 'new_job', E.newJob(t, job));
-  }
+  const tradies = q.matching.all({ trade, region: job.region, sector: job.sector }).filter((t) => t.id !== job.customer_id);
+  for (const t of tradies) send(t, 'new_job', E.newJob(t, job));
+  q.setAlerted.run(tradies.length, job.id);
+  const customer = q.user.get(job.customer_id);
+  for (const a of admins()) send(a, 'admin_new_job', E.newJobForAdmin(a, job, customer, tradies.length, newAccount));
   return tradies.length;
 }
 
-function quoteReceived(quoteId) {
+// `updated` when the tradie changed a quote they'd already sent.
+function quoteReceived(quoteId, { updated = false } = {}) {
   const quote = q.quote.get(quoteId);
   const job = q.job.get(quote.job_id);
   const customer = q.user.get(job.customer_id);
-  send(customer, 'quote_received', E.quoteReceived(customer, job, quote, businessOf(quote.tradie_id), q.liveQuotes.get(job.id).n));
+  send(customer, 'quote_received', E.quoteReceived(customer, job, quote, businessOf(quote.tradie_id), q.liveQuotes.get(job.id).n, updated));
+}
+
+// The customer closed a job. Everyone who'd quoted hears, including a tradie whose quote was accepted
+// but not yet paid for. `quotes` are the quotes as they were just before it closed.
+function jobClosed(jobId, quotes) {
+  const job = q.job.get(jobId);
+  for (const qt of quotes) {
+    const tradie = q.user.get(qt.tradie_id);
+    if (tradie) send(tradie, 'job_closed', E.jobClosed(tradie, job, qt.status === 'accepted'));
+  }
+}
+
+function reviewReceived(reviewId) {
+  const review = q.review.get(reviewId);
+  const job = q.job.get(review.job_id);
+  const tradie = q.user.get(review.tradie_id);
+  const customer = q.user.get(review.customer_id);
+  send(tradie, 'review_received', E.reviewReceived(tradie, job, review, customer.name.split(' ')[0]));
+}
+
+function newSignup(userId) {
+  const user = q.user.get(userId);
+  if (!user || !['customer', 'tradie'].includes(user.role)) return;
+  for (const a of admins()) send(a, 'admin_signup', E.newSignup(a, user));
 }
 
 function quoteAccepted(quoteId) {
@@ -145,7 +174,7 @@ function safe(fn) {
 module.exports = {
   ...Object.fromEntries(
     Object.entries({
-      jobPosted, quoteReceived, quoteAccepted, paymentHeld, paymentReleased, refunded,
+      jobPosted, quoteReceived, jobClosed, reviewReceived, newSignup, quoteAccepted, paymentHeld, paymentReleased, refunded,
       tradieReviewed, tradieSubmitted, disputeOpened, teamInvite, passwordReset, verifyEmail, adminAlert,
     }).map(([k, fn]) => [k, safe(fn)]),
   ),

@@ -114,6 +114,10 @@ addColumn('users', 'company', 'TEXT');
 addColumn('users', 'customer_type', 'TEXT');
 addColumn('jobs', 'sector', "TEXT NOT NULL DEFAULT 'housing'");
 addColumn('jobs', 'requirements', 'TEXT');
+// When the customer accepted a quote (for the "pay to lock it in" reminder), and how many tradies the
+// new-job alert went to (for the admin's alerts).
+addColumn('jobs', 'awarded_at', 'TEXT');
+addColumn('jobs', 'alerted', 'INTEGER');
 addColumn('tradie_profiles', 'sectors', "TEXT NOT NULL DEFAULT 'housing'");
 addColumn('tradie_profiles', 'tickets', 'TEXT');
 

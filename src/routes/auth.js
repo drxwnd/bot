@@ -192,6 +192,7 @@ router.post('/signup', signupLimit, async (req, res, next) => {
   }
   logIn(req, userId);
   verification.send(userId);
+  notify.newSignup(userId);
 
   if (role === 'tradie') {
     flash(req, 'success', 'Account created. Now tell us about your business so we can check you over.');
@@ -304,6 +305,20 @@ router.post('/unsubscribe', (req, res) => {
   const on = req.body.on === '1' ? 1 : 0;
   db.prepare('UPDATE users SET email_alerts = ? WHERE id = ?').run(on, user.id);
   res.render('pages/unsubscribe', { title: 'Job alerts', email: user.email, alerts: Boolean(on), u: user.id, t: req.body.t });
+});
+
+// One-click unsubscribe from the List-Unsubscribe header. Mail apps POST here without a cookie or form
+// token (so it's let past the CSRF check in server.js); the signed token in the link is what proves it.
+// Opening the link in a browser shows the normal page instead.
+router.get('/unsubscribe/one-click', (req, res) => {
+  res.redirect(`/unsubscribe?${new URLSearchParams({ u: String(req.query.u || ''), t: String(req.query.t || '') })}`);
+});
+
+router.post('/unsubscribe/one-click', (req, res) => {
+  const user = checkUnsubscribe(req.query.u, req.query.t);
+  if (!user) return res.status(400).type('text').send('Link not recognised');
+  db.prepare('UPDATE users SET email_alerts = 0 WHERE id = ?').run(user.id);
+  res.type('text').send('Unsubscribed from job alerts and reminders');
 });
 
 router.post('/logout', (req, res) => {

@@ -16,6 +16,8 @@ function unsubscribeToken(userId) {
   return crypto.createHmac('sha256', config.sessionSecret).update(`unsubscribe:${userId}`).digest('base64url').slice(0, 24);
 }
 const unsubscribeUrl = (userId) => url(`/unsubscribe?u=${userId}&t=${unsubscribeToken(userId)}`);
+// For the List-Unsubscribe header: mail apps POST here when someone taps their own Unsubscribe button.
+const oneClickUrl = (userId) => url(`/unsubscribe/one-click?u=${userId}&t=${unsubscribeToken(userId)}`);
 
 // lines: strings (paragraphs) or { rows: [[label, value], ...] } for a small table.
 function layout({ subject, heading, lines, button, footer, unsubscribe }) {
@@ -65,7 +67,7 @@ ${htmlParts.join('\n')}
   }</td></tr>
 </table></td></tr></table></body></html>`;
 
-  return { subject, text: textParts.join('\n'), html };
+  return { subject, text: textParts.join('\n'), html, ...(unsubscribe ? { listUnsubscribe: oneClickUrl(unsubscribe) } : {}) };
 }
 
 const jobNo = (job) => `#${String(job.id).padStart(4, '0')}`;
@@ -86,16 +88,19 @@ const T = {
       unsubscribe: tradie.id,
     }),
 
-  quoteReceived: (customer, job, quote, business, count) => {
+  // `updated` when a tradie changes a quote they'd already sent, so it doesn't read as a second tradie.
+  quoteReceived: (customer, job, quote, business, count, updated = false) => {
     // The price shown is what the customer would pay, payment fee included.
     const fee = customerFeeFor(quote.amount_cents);
     const total = money(quote.amount_cents + fee);
     return layout({
-      subject: `New quote for your job: ${total} from ${business}`,
-      heading: `${business} quoted ${total}`,
+      subject: updated ? `${business} updated their quote: ${total}` : `New quote for your job: ${total} from ${business}`,
+      heading: updated ? `${business} updated their quote to ${total}` : `${business} quoted ${total}`,
       lines: [
         ...(fee ? [`That's ${money(quote.amount_cents)} for the job plus a ${money(fee)} secure payment fee.`] : []),
-        `For your job "${job.title}" in ${job.suburb}. ${count > 1 ? `You now have ${count} quotes to compare.` : "It's your first quote. More usually follow within a day or two."}`,
+        updated
+          ? `For your job "${job.title}" in ${job.suburb}. This replaces the price they sent before.`
+          : `For your job "${job.title}" in ${job.suburb}. ${count > 1 ? `You now have ${count} quotes to compare.` : "It's your first quote. More usually follow within a day or two."}`,
         quote.message.length > 300 ? quote.message.slice(0, 300) + '…' : quote.message,
         "You don't have to accept any quote. When you do, you pay and we hold the money until the job's done.",
       ],
@@ -123,6 +128,32 @@ const T = {
         'New jobs come in every day. Keep your profile up to date, as customers look at it when comparing quotes.',
       ],
       button: { label: 'Browse open jobs', href: url('/jobs') },
+    }),
+
+  // The customer closed a job this tradie had quoted on. `accepted` if theirs was the quote they'd picked.
+  jobClosed: (tradie, job, accepted) =>
+    layout({
+      subject: `Job closed: ${job.title}`,
+      heading: 'The customer closed this job',
+      lines: [
+        accepted
+          ? `The customer has closed "${job.title}" in ${job.suburb} before paying, so it won't go ahead. Don't start any work on it.`
+          : `The customer has closed "${job.title}" in ${job.suburb}, so it's no longer taking quotes. There's nothing you need to do.`,
+        'New jobs come in every day, and we email you when one matches your trades and areas.',
+      ],
+      button: { label: 'Browse open jobs', href: url('/jobs') },
+    }),
+
+  reviewReceived: (tradie, job, review, customerName) =>
+    layout({
+      subject: `New ${review.rating}-star review: ${job.title}`,
+      heading: `${customerName} left you a ${review.rating}-star review`,
+      lines: [
+        `${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)} for "${job.title}" in ${job.suburb}.`,
+        ...(review.comment ? [`"${review.comment.length > 500 ? review.comment.slice(0, 500) + '…' : review.comment}"`] : []),
+        "It's on your public profile now. You can post one reply, which shows under the review.",
+      ],
+      button: { label: 'Reply to it', href: url('/dashboard/reviews') },
     }),
 
   paidToTradie: (tradie, job, payment, payout) =>
@@ -313,15 +344,72 @@ const T = {
       unsubscribe: tradie.id,
     }),
 
-  noQuotes: (admin, job, days) =>
+  // `age` is how long it's been up, e.g. "4 hours" or "2 days".
+  noQuotes: (admin, job, age) =>
     layout({
-      subject: `No quotes after ${days} days: ${job.title}`,
+      subject: `No quotes after ${age}: ${job.title}`,
       heading: `Nobody has quoted on job ${jobNo(job)}`,
       lines: [
-        { rows: [['Job', job.title], ['Trade', C.tradeName[job.trade]], ['Where', `${place(job)} (${C.regionName[job.region]})`], ['Posted', `${days} days ago`]] },
+        { rows: [['Job', job.title], ['Trade', C.tradeName[job.trade]], ['Where', `${place(job)} (${C.regionName[job.region]})`], ['Posted', `${age} ago`],
+          ...(job.alerted !== null && job.alerted !== undefined ? [['Tradies alerted', String(job.alerted)]] : [])] },
         "Early on, this is where you win or lose customers. Ring a few tradies who do this work and ask them to quote, or let the customer know you're on it.",
       ],
       button: { label: 'Open the job', href: url(`/jobs/${job.id}`) },
+    }),
+
+  payReminder: (customer, job, quote, business) => {
+    const fee = customerFeeFor(quote.amount_cents);
+    return layout({
+      subject: `Pay to lock in ${business}: ${job.title}`,
+      heading: `${business} is waiting on your payment`,
+      lines: [
+        `You accepted ${business}'s quote for "${job.title}". Pay ${money(quote.amount_cents + fee)} to lock it in${fee ? ` (${money(quote.amount_cents)} for the job plus a ${money(fee)} secure payment fee)` : ''}.`,
+        `We hold the money until you tell us the job's done. Once it's paid, ${business} gets your details to book a time.`,
+        "Changed your mind? Close the job from its page so they're not left waiting.",
+      ],
+      button: { label: 'Pay now', href: url(`/jobs/${job.id}#payment`) },
+      unsubscribe: customer.id,
+    });
+  },
+
+  // ---- For the admin, as things happen ----
+
+  newJobForAdmin: (admin, job, customer, alerted, newAccount) =>
+    layout({
+      subject: alerted
+        ? `New job: ${C.tradeName[job.trade]} in ${job.suburb} (${alerted} tradie${alerted === 1 ? '' : 's'} alerted)`
+        : `New job, 0 MATCHES: ${C.tradeName[job.trade]} in ${job.suburb}`,
+      heading: job.title,
+      lines: [
+        { rows: [
+          ['Customer', `${customer.name}${newAccount ? ' (new account)' : ''}`],
+          ...(customer.company ? [['Business', customer.company]] : []),
+          ['Phone', customer.phone || 'Not given'],
+          ['Email', `${customer.email}${customer.email_verified_at ? '' : ' (not confirmed yet)'}`],
+          ['Trade', C.tradeName[job.trade]],
+          ['Where', `${place(job)} (${C.regionName[job.region]})`],
+          ['Budget', C.budgetName[job.budget]],
+          ['When', C.timingName[job.timing]],
+          ['Tradies alerted', String(alerted)],
+        ] },
+        alerted
+          ? "If nobody has quoted within a day, you'll get another email."
+          : "No approved tradie covers this trade and area yet. Ring someone today, or tell the customer you're finding them one.",
+      ],
+      button: { label: 'Open the job', href: url(`/jobs/${job.id}`) },
+    }),
+
+  newSignup: (admin, user) =>
+    layout({
+      subject: `New ${user.role === 'tradie' ? 'tradie' : 'customer'}: ${user.name}${user.company ? `, ${user.company}` : ''}`,
+      heading: `${user.name} just signed up as a ${user.role === 'tradie' ? 'tradie' : 'customer'}`,
+      lines: [
+        { rows: [['Name', user.name], ['Email', user.email], ['Phone', user.phone || 'Not given'], ...(user.company ? [['Business', user.company]] : [])] },
+        user.role === 'tradie'
+          ? "They still need to confirm their email and add their business details. Early on, a quick call to help them finish makes a big difference."
+          : "A quick hello goes a long way early on. Ask what they need done.",
+      ],
+      button: { label: 'Open admin', href: url('/admin#users') },
     }),
 
   adminAlert: (admin, text) =>
@@ -343,4 +431,4 @@ const T = {
     }),
 };
 
-module.exports = { ...T, unsubscribeToken, unsubscribeUrl };
+module.exports = { ...T, unsubscribeToken, unsubscribeUrl, oneClickUrl };

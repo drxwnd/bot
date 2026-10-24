@@ -26,7 +26,15 @@ async function providerError(name, res) {
   return err;
 }
 
+// Alert and reminder emails carry List-Unsubscribe headers, so Gmail, Outlook and Apple Mail show their own
+// Unsubscribe button and can turn alerts off in one tap (RFC 8058). Gmail and Yahoo expect these.
+function unsubscribeHeaders(message) {
+  if (!message.listUnsubscribe) return {};
+  return { 'List-Unsubscribe': `<${message.listUnsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' };
+}
+
 async function deliver(message) {
+  const headers = unsubscribeHeaders(message);
   if (config.resendApiKey) {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -38,6 +46,7 @@ async function deliver(message) {
         subject: message.subject,
         text: message.text,
         html: message.html,
+        ...(Object.keys(headers).length ? { headers } : {}),
       }),
     });
     if (!res.ok) throw await providerError('Resend', res);
@@ -59,6 +68,7 @@ async function deliver(message) {
         TextBody: message.text,
         HtmlBody: message.html,
         MessageStream: 'outbound',
+        ...(Object.keys(headers).length ? { Headers: Object.entries(headers).map(([Name, Value]) => ({ Name, Value })) } : {}),
       }),
     });
     if (!res.ok) throw await providerError('Postmark', res);

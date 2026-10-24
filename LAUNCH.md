@@ -134,14 +134,16 @@ Then swap in the live keys: `fly secrets set STRIPE_SECRET_KEY=sk_live_... STRIP
 - **Contact details** only appear once the customer has paid. Both sides get each other's phone and email at that point, not before. That keeps the job (and your fee) on the platform. Phone numbers, emails and web links are also refused in quotes, job descriptions, tradie profiles, photo captions, reviews and review replies, so nobody can slip them in early.
 - **Limits against abuse:** 10 jobs a day per customer account, 20 team invites a day per account, 3 password reset emails an hour per address, and login guessing is slowed per IP and per account. If a big customer needs more jobs a day, change `JOBS_PER_DAY` in `src/routes/jobs.js`.
 - **Refunds** give back the quote amount only. The secure payment fee is kept, since Stripe keeps its card fee on a refunded payment. The terms and the job page say so before anyone pays.
+- **As things happen:** a tradie hears when their quote is accepted or another one wins, when a job they quoted on is closed (with a "don't start" warning if theirs was accepted but not paid), when they get a review, and when they're paid. A customer hears about each quote (an "updated their quote" email when a tradie changes the price), gets a receipt, and is asked for a review.
 - **Reminders, checked every hour:**
   - quotes waiting a day: nudges the customer
+  - quote accepted but not paid after a day: reminds the customer to pay
   - payment held 7 and 14 days: asks the customer if the job's done
-  - held 21 days: alerts you
+  - tradie hasn't confirmed their email after 1 and 3 days: sends a fresh link
   - tradie hasn't finished sign-up: nudges them
   - tradie approved but no payouts: nudges them
-- **Alerts to you:** a new tradie to check, a job with no quotes after 3 days (ring someone), and card disputes, which also block release until resolved.
-- **Account basics:** password reset by email, and an unsubscribe link on alert emails (required under the Spam Act).
+- **Alerts to you:** every sign-up, every new job (with the customer's details and how many tradies it reached; the subject says "0 MATCHES" when nobody covers it), a job with no quotes after a day (or 4 hours if no tradie was alerted), a quote accepted but unpaid for 3 days, a new tradie to check, a payment held 21 days, and card disputes, which also block release until resolved.
+- **Account basics:** password reset by email, and an unsubscribe link on alert and reminder emails (required under the Spam Act). Those emails also carry the standard one-click unsubscribe header, which Gmail and Yahoo expect.
 
 ## 7. Getting the first 100 jobs
 

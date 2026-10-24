@@ -47,6 +47,8 @@ Tradebench is a Perth/WA marketplace for repair, maintenance and building jobs: 
 
 ## What was done recently
 
+- Email gaps filled (after 7279e75): founder alerts (every sign-up; every new job with matched-tradie count and "0 MATCHES"; no-quotes alert at 24h, or 4h with no match; unpaid accepted quote at 3 days), "updated their quote" emails, job-closed emails to quoting tradies, review-received emails, pay reminder at 1 day, confirm-email reminders for tradies at 1 and 3 days, and List-Unsubscribe one-click headers. Tests in `test/emails.test.js`.
+
 - Pre-launch fixes, Dockerfile build fix, domain/email/search setup (commits up to 8dd4ca8).
 - Security tightening (c77465c): logout revokes the session, checkout de-dup lock, full auto-refunds, upload caps, stricter headers, Dependabot.
 - Email verification, Verified badges, two-step login with backup codes (7279e75).
@@ -55,7 +57,7 @@ Tradebench is a Perth/WA marketplace for repair, maintenance and building jobs: 
 
 1. **Fix the 5 confirmed findings** in `docs/SECURITY_AUDIT.md` (C1–C5), with tests, then deploy.
 2. **Check the 36 unreviewed findings** (U1–U36): for each, trace the code or reproduce it locally and decide real or not; fix the real ones. Several touch money (U5, U6, U21–U24) and should come first.
-3. **Growth plan P0 product fixes** (`docs/GROWTH_PLAN.md` section 10): hold back checkout until Stripe is live, founder alerts, source tracking, claims/copy fixes (e.g. "pay only when it's done", "mine sites" in the title, the 2% fee wording on the terms page given the card-surcharge ban), the email-confirmation step in the tradie checklist, empty states, live "You'll receive $X" on quotes. Some of these are business decisions (fee refunds, quote caps of $7,499 on homes): confirm with the owner first.
+3. **Growth plan P0 product fixes** (`docs/GROWTH_PLAN.md` section 10): hold back checkout until Stripe is live, source tracking, claims/copy fixes (e.g. "pay only when it's done", "mine sites" in the title, the 2% fee wording on the terms page given the card-surcharge ban), the email-confirmation step in the tradie checklist, empty states, live "You'll receive $X" on quotes. Some of these are business decisions (fee refunds, quote caps of $7,499 on homes): confirm with the owner first.
 4. **Owner-only steps** (accounts, money, legal): turn on two-step for the admin account; confirm the admin email; two-step on GitHub, Fly, GoDaddy (and Domain Lock), Stripe, Resend, ImprovMX, Google; ABN; legal and accountant questions; live Stripe account; backups copied off the Fly machine.
 
 ## How the owner likes to work

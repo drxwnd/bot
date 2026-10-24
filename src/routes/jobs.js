@@ -81,7 +81,8 @@ const q = {
   withdrawQuote: db.prepare(`UPDATE quotes SET status = 'withdrawn' WHERE id = ? AND status = 'pending'`),
   acceptQuote: db.prepare(`UPDATE quotes SET status = 'accepted' WHERE id = ?`),
   declineOthers: db.prepare(`UPDATE quotes SET status = 'declined' WHERE job_id = ? AND id != ? AND status = 'pending'`),
-  awardJob: db.prepare(`UPDATE jobs SET status = 'awarded', accepted_quote_id = ? WHERE id = ? AND status = 'open'`),
+  awardJob: db.prepare(`UPDATE jobs SET status = 'awarded', accepted_quote_id = ?, awarded_at = datetime('now') WHERE id = ? AND status = 'open'`),
+  liveQuotes: db.prepare("SELECT tradie_id, status FROM quotes WHERE job_id = ? AND status IN ('pending', 'accepted')"),
   cancelJob: db.prepare(`UPDATE jobs SET status = 'cancelled' WHERE id = ? AND status IN ('open', 'awarded')`),
   declineAll: db.prepare(`UPDATE quotes SET status = 'declined' WHERE job_id = ? AND status IN ('pending', 'accepted')`),
   profile: db.prepare('SELECT * FROM tradie_profiles WHERE user_id = ?'),
@@ -246,7 +247,7 @@ router.post(
     }
     if (photos.skipped) flash(req, 'info', uploads.UNREADABLE);
 
-    notify.jobPosted(id);
+    notify.jobPosted(id, { newAccount: Boolean(newUser) });
     indexnow.submit(`/jobs/${id}`);
     if (!photos.skipped) {
       flash(req, 'success', newUser
@@ -359,10 +360,12 @@ router.post('/jobs/:id/cancel', requireLogin, loadJob, ownsJob, requireJobAction
     flash(req, 'error', `This job has been paid. Email ${config.supportEmail} and we'll sort out a refund.`);
     return res.redirect(`/jobs/${req.job.id}`);
   }
+  const quoted = q.liveQuotes.all(req.job.id);
   db.transaction(() => {
     q.cancelJob.run(req.job.id);
     q.declineAll.run(req.job.id);
   })();
+  notify.jobClosed(req.job.id, quoted);
   indexnow.submit(`/jobs/${req.job.id}`);
   // Close any checkout page that's still open, so nobody can pay for a cancelled job.
   if (payment) payments.expireCheckout(payment).catch((err) => console.error('Could not expire checkout:', err.message));
@@ -401,8 +404,9 @@ router.post('/jobs/:id/quotes', requireRole('tradie'), requireCan('quote'), requ
   } else if (hasContactDetails(message)) {
     flash(req, 'error', NO_CONTACTS_TRADIE);
   } else {
+    const before = q.myQuote.get(job.id, req.account.ownerId);
     q.insertQuote.run(job.id, req.account.ownerId, amount, message, start);
-    notify.quoteReceived(q.myQuote.get(job.id, req.account.ownerId).id);
+    notify.quoteReceived(q.myQuote.get(job.id, req.account.ownerId).id, { updated: Boolean(before && before.status === 'pending') });
     flash(req, 'success', "Quote sent. We've emailed the customer, and we'll email you if they accept.");
   }
   res.redirect(`/jobs/${job.id}#quote`);
@@ -527,7 +531,8 @@ router.post('/jobs/:id/review', requireLogin, loadJob, ownsJob, (req, res) => {
     return res.redirect(`/jobs/${job.id}#review`);
   }
   const quote = q.quote.get(job.accepted_quote_id);
-  q.insertReview.run(job.id, quote.tradie_id, job.customer_id, rating, comment);
+  const reviewId = q.insertReview.run(job.id, quote.tradie_id, job.customer_id, rating, comment).lastInsertRowid;
+  notify.reviewReceived(reviewId);
   flash(req, 'success', 'Thanks, your review is up.');
   res.redirect(`/jobs/${job.id}`);
 });
